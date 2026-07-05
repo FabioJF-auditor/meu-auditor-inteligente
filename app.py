@@ -3,28 +3,28 @@ import pandas as pd
 import plotly.graph_objects as go
 from pypdf import PdfReader
 import google.generativeai as genai
+from openai import OpenAI
 import json
 import re
 from PIL import Image
 import io
 
 # 1. CONFIGURAÇÃO DA PÁGINA
-st.set_page_config(page_title="Plataforma de Auditoria Inteligente RINA", page_icon="✈️", layout="wide")
+st.set_page_config(page_title="Plataforma de Auditoria Avançada RINA", page_icon="✈️", layout="wide")
 
-# 2. CONEXÃO COM O MOTOR GEMINI
+# 2. CONFIGURAÇÃO DOS MOTORES DE IA (Puxando dos Secrets)
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    client_openai = OpenAI(api_key=st.secrets.get("OPENAI_API_KEY", ""))
 except:
     pass
 
-# Inicializa as variáveis na memória do servidor
 if "banco_conhecimento" not in st.session_state:
     st.session_state.banco_conhecimento = "Diretrizes padrão Petrobras/RINA aplicadas para auditorias de aeronavegabilidade."
 
 # 3. CONTROLE DE ACESSO
 if "usuarios_db" not in st.session_state:
     st.session_state.usuarios_db = {"fabio.ferreira@rina.org": "administrador"}
-
 if "usuario_logado" not in st.session_state:
     st.session_state.usuario_logado = None
 
@@ -45,7 +45,7 @@ if st.session_state.usuario_logado is None:
     st.stop()
 
 # --- INTERFACE PRINCIPAL ---
-st.title("🚀 Hub de Auditoria Multimodal Baseado em IA")
+st.title("🚀 Hub de Inteligência Artificial Multimotor em Auditoria")
 st.write(f"**Auditor Responsável:** {st.session_state.usuario_logado}")
 
 aba_auditoria, aba_dashboard, aba_conhecimento, aba_admin = st.tabs([
@@ -55,102 +55,108 @@ aba_auditoria, aba_dashboard, aba_conhecimento, aba_admin = st.tabs([
     "🛠️ Painel Admin"
 ])
 
-# ==========================================
-# FUNÇÃO AUXILIAR PARA PROCESSAR ARQUIVOS EM MASSA
-# ==========================================
 def extrair_dados_multiplos_arquivos(arquivos):
     conteudo_gemini = []
     texto_acumulado = ""
-    
     for i, arquivo in enumerate(arquivos):
         nome = arquivo.name.lower()
-        if nome.endswith(('.png', '.jpg', '.jpeg')):
-            # Se forem muitas imagens, limitamos o envio das primeiras para não estourar a memória
-            if i < 10: 
-                img = Image.open(arquivo)
-                conteudo_gemini.append(img)
+        if nome.endswith(('.png', '.jpg', '.jpeg')) and i < 10:
+            conteudo_gemini.append(Image.open(arquivo))
         elif nome.endswith('.pdf'):
             reader = PdfReader(arquivo)
-            for page in reader.pages:
-                texto_acumulado += page.extract_text() + "\n"
+            for page in reader.pages: texto_acumulado += page.extract_text() + "\n"
         elif nome.endswith('.xlsx'):
             df = pd.read_excel(arquivo).dropna(how='all')
             texto_acumulado += f"\n[Planilha {arquivo.name}]:\n{df.to_string()}\n"
-            
     return conteudo_gemini, texto_acumulado
 
-# ==========================================
-# ABA: ENRIQUECER BASE DE CONHECIMENTO
-# ==========================================
-with aba_conhecimento:
-    st.header("📝 Treinar e Alimentar o Cérebro da IA")
-    st.write("Forneça manuais, procedimentos atualizados RINA ou novas portarias:")
-    
-    arquivos_banco = st.file_uploader("Carregar documentos de referência para o Banco de Dados:", type=["pdf", "txt", "xlsx"], accept_multiple_files=True, key="banco_up")
-    
-    if arquivos_banco:
-        if st.button("🔄 Incorporar Arquivos ao Banco de Conhecimento"):
-            _, texto_novos_manuais = extrair_dados_multiplos_arquivos(arquivos_banco)
-            st.session_state.banco_conhecimento += f"\n\n[MANUAIS COMPLEMENTARES]:\n{texto_novos_manuais}"
-            st.success(f"✅ {len(arquivos_banco)} documento(s) indexado(s) na memória!")
-            
-    st.write("---")
-    texto_manual = st.text_area("Instruções e Regras de Negócio em Texto:", value=st.session_state.banco_conhecimento, height=150)
-    if st.button("Salvar Regras em Texto"):
-        st.session_state.banco_conhecimento = texto_manual
-        st.success("Regras salvas com sucesso.")
+def chamar_ia_selecionada(motor, prompt, lista_midia):
+    if motor == "Gemini 2.5 Flash":
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        response = model.generate_content(lista_midia)
+        return response.text
+    elif motor == "GPT-4o (OpenAI)":
+        response = client_openai.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.choices[0].message.content
+    return ""
 
 # ==========================================
-# ABA: EXECUÇÃO DO CHECKLIST DOCUMENTAL
+# ABA: EXECUÇÃO DO CHECKLIST COM MOTOR SELECIONÁVEL
 # ==========================================
 with aba_auditoria:
-    c1, c2, c3 = st.columns(3)
-    with c1: prefixo = st.text_input("Prefixo (Ex: PR-XYZ):", value="PR-").strip().upper()
-    with c2: modelo = st.text_input("Modelo da Aeronave (Ex: AW139):").strip().upper()
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: prefixo = st.text_input("Prefixo:", value="PR-").strip().upper()
+    with c2: modelo = st.text_input("Modelo da Aeronave:").strip().upper()
     with c3: escopo = st.selectbox("Escopo:", ["ACCD (Documental)", "ACC (Física/Documental)", "ACCI (Inicial)"])
+    with c4: motor_ia = st.selectbox("🧠 Escolha o Motor de Inteligência Artificial:", ["Gemini 2.5 Flash", "GPT-4o (OpenAI)"])
 
     st.write("---")
-    st.subheader("📥 Carregar Evidências para Cruzamento de Dados")
     arquivos_auditoria = st.file_uploader("Selecione um ou mais arquivos simultaneamente:", type=["pdf", "png", "jpg", "jpeg", "xlsx"], accept_multiple_files=True, key="aud_up")
 
     if arquivos_auditoria:
-        if st.button(f"🔍 Executar Checklist Combinado ({len(arquivos_auditoria)} arquivos)"):
-            st.info("⚙️ Conectando ao motor de produção Gemini... Cruzando informações...")
+        if st.button(f"🔍 Executar Checklist de Auditoria Avançado ({len(arquivos_auditoria)} arquivos)"):
+            st.info(f"⚙️ Processando análise através do motor {motor_ia}...")
             
             lista_midia, texto_total = extrair_dados_multiplos_arquivos(arquivos_auditoria)
             
-            prompt = f"""
-            Você é um Engenheiro de Aeronavegabilidade e Auditor Sênior para Petrobras/RINA.
-            Analise as evidências fornecidas para a aeronave {prefixo} ({modelo}) no escopo {escopo}.
-            Use como regra estrita esta base de conhecimentos: \"\"\"{st.session_state.banco_conhecimento}\"\"\"
+            prompt_auditoria = f"""
+            Você é um Engenheiro de Aeronavegabilidade e Auditor Sênior especialista Petrobras/RINA.
+            Analise rigorosamente os dados da aeronave {prefixo} ({modelo}) no escopo {escopo}.
+            Base normativa de suporte: \"\"\"{st.session_state.banco_conhecimento}\"\"\"
 
-            Examine as imagens e os textos. Monte o checklist extraindo validades, datas de execução e pareceres técnicos.
-            Retorne um JSON estrito, sem tags markdown:
+            Varra os documentos fornecidos buscando preencher com precisão milimétrica o checklist.
+            Para cada item, determine o status (CF para Conforme, NC para Não Conforme) e extraia dados textuais exatos do arquivo no campo 'info_checklist' (Validades exatas encontradas, datas de realização e dados numéricos coerentes).
+
+            Retorne um JSON puro, sem formatação markdown:
             {{
-                "seguro_reta": {{"status": "CF", "info_checklist": "Validade DD/MM/AAAA, 5 adendos", "justificativa": "Texto"}},
-                "aprs_assinaturas": {{"status": "CF", "info_checklist": "Data da assinatura e responsável", "justificativa": "Texto"}},
-                "rastreabilidade_pecas": {{"status": "CF", "info_checklist": "Dados do Form 1 coletados", "justificativa": "Texto"}},
-                "prazos_paradas": {{"status": "CF", "info_checklist": "Prazos contratuais identificados", "justificativa": "Texto"}},
+                "seguro_reta": {{"status": "CF", "info_checklist": "Texto com validades e adendos encontrados no documento", "justificativa": "Parecer técnico"}},
+                "aprs_assinaturas": {{"status": "CF", "info_checklist": "Dados de assinaturas e ordens de serviço identificadas", "justificativa": "Parecer técnico"}},
+                "rastreabilidade_pecas": {{"status": "CF", "info_checklist": "Dados do Form 1, part numbers e serial numbers analisados", "justificativa": "Parecer técnico"}},
+                "prazos_paradas": {{"status": "CF", "info_checklist": "Datas e contagem de dias identificadas nos cards", "justificativa": "Parecer técnico"}},
                 "gatilhos_vermelhos": 0, "gatilhos_amarelos": 0
             }}
-            Textos extraídos: {texto_total[:12000]}
+            Documentação recebida: {texto_total[:12000]}
             """
-            lista_midia.append(prompt)
+            lista_midia.append(prompt_auditoria)
             
             try:
-                # 🔄 UTILIZANDO O MODELO DE PRODUÇÃO ATUALIZADO
-                model = genai.GenerativeModel('gemini-2.5-flash')
-                response = model.generate_content(lista_midia)
-                res_clean = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", response.text.strip()).strip()
+                raw_response = chamar_ia_selecionada(motor_ia, prompt_auditoria, lista_midia)
+                res_clean = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", raw_response.strip()).strip()
                 res_json = json.loads(res_clean)
                 
-                st.success("📋 Resultados do Checklist Técnico Analisados!")
+                st.success("📋 Resultados do Checklist Técnico Coletados!")
+                
+                # --- MONTAGEM DA TABELA DE DADOS PARA DOWNLOAD ---
+                dados_tabela = {
+                    "Item do Checklist": ["Seguro RETA e Validades", "Liberações e Assinaturas (APRS)", "Rastreabilidade (Form 1)", "Prazos e Alertas Contratuais"],
+                    "Status Analisado": [res_json["seguro_reta"]["status"], res_json["aprs_assinaturas"]["status"], res_json["rastreabilidade_pecas"]["status"], res_json["prazos_paradas"]["status"]],
+                    "Informações Coletadas (Validades/Datas)": [res_json["seguro_reta"]["info_checklist"], res_json["aprs_assinaturas"]["info_checklist"], res_json["rastreabilidade_pecas"]["info_checklist"], res_json["prazos_paradas"]["info_checklist"]],
+                    "Justificativa Técnica do Auditor IA": [res_json["seguro_reta"]["justificativa"], res_json["aprs_assinaturas"]["justificativa"], res_json["rastreabilidade_pecas"]["justificativa"], res_json["prazos_paradas"]["justificativa"]]
+                }
+                df_checklist_respondido = pd.DataFrame(dados_tabela)
+                
+                output_excel = io.BytesIO()
+                with pd.ExcelWriter(output_excel, engine='openpyxl') as writer:
+                    df_checklist_respondido.to_excel(writer, index=False, sheet_name=f"Checklist {prefixo}")
+                dados_excel_bytes = output_excel.getvalue()
+
+                st.download_button(
+                    label="📥 Baixar Checklist Respondido em Excel (.xlsx)",
+                    data=dados_excel_bytes,
+                    file_name=f"Checklist_Auditoria_{prefixo}_{escopo}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+                
+                st.write("---")
                 col_res1, col_res2 = st.columns(2)
                 with col_res1:
                     def bloco(nome, obj):
                         simb = "🟢" if obj["status"] == "CF" else "🔴"
                         with st.expander(f"{simb} {nome} [{obj['status']}]", expanded=True):
-                            st.write(f"**ℹ️ Dados do Documento:** {obj['info_checklist']}")
+                            st.write(f"**ℹ️ Dados do Documento (Validades/Datas):** *{obj['info_checklist']}*")
                             st.write(f"**💬 Parecer da IA:** {obj['justificativa']}")
                     bloco("Seguro RETA e Validades", res_json["seguro_reta"])
                     bloco("Liberações e Assinaturas (APRS/RII)", res_json["aprs_assinaturas"])
@@ -161,57 +167,47 @@ with aba_auditoria:
                     fig.update_layout(template="plotly_white", height=300)
                     st.plotly_chart(fig, use_container_width=True)
             except Exception as e:
-                st.error(f"Erro no processamento. Detalhes: {e}")
+                st.error(f"Erro no processamento multimotor. Detalhes: {e}")
 
 # ==========================================
-# ABA: ANÁLISE ISOLADA DE DASHBOARD
+# OUTRAS ABAS MANTIDAS
 # ==========================================
 with aba_dashboard:
     st.header("📊 Análise de Tendências e Janela de 60 Dias")
     arquivo_dash = st.file_uploader("Carregar PDF ou Print do Painel de Indicadores:", type=["pdf", "png", "jpg", "jpeg", "xlsx"], key="dash_up")
-    
     if arquivo_dash:
         if st.button("⚡ Analisar Apenas Gatilhos de Performance"):
-            st.info("Buscando picos de indisponibilidade no modelo de produção...")
-            
+            st.info("Buscando picos de indisponibilidade operacional...")
             midias, texto_dash = extrair_dados_multiplos_arquivos([arquivo_dash])
-            prompt_dash = f"""
-            Você é um auditor de performance operacional de helicópteros offshore.
-            Analise a evidência enviada buscando eventos críticos nos últimos 60 dias (TOP 10 indisponibilidade, TOP 3 cortes, panes repetitivas ou quebra de prazo de 30 dias).
-
-            Retorne um JSON estruturado sem markdown:
-            {{
-                "panes_repetitivas": {{"status": "CF", "dados": "Detalhamento encontrado"}},
-                "ranking_indisponibilidade": {{"status": "CF", "dados": "Posição encontrada"}},
-                "prazo_abertura": {{"status": "CF", "dados": "Janela identificada"}},
-                "critico": 0
-            }}
-            Texto complementar: {texto_dash[:10000]}
-            """
+            prompt_dash = f"Analise a evidência buscando eventos críticos operacionais em 60 dias (TOP 10, TOP 3, prazos). Retorne JSON puro:\n{{\"panes_repetitivas\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"ranking_indisponibilidade\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"prazo_abertura\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"critico\": 0}}\nTexto: {texto_dash[:10000]}"
             midias.append(prompt_dash)
-            
             try:
-                # 🔄 UTILIZANDO O MODELO DE PRODUÇÃO ATUALIZADO
                 model = genai.GenerativeModel('gemini-2.5-flash')
                 res_dash = model.generate_content(midias)
                 clean_dash = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", res_dash.text.strip()).strip()
                 json_dash = json.loads(clean_dash)
-                
                 st.subheader("🚨 Diagnóstico de Alertas Operacionais")
-                if json_dash["critico"] == 1:
-                    st.error("⚠️ ALERTA: Esta aeronave atingiu gatilhos contratuais críticos!")
-                else:
-                    st.success("🟢 Performance operacional em conformidade.")
-                    
+                if json_dash["critico"] == 1: st.error("⚠️ ALERTA: Esta aeronave atingiu gatilhos críticos!")
+                else: st.success("🟢 Performance operacional em conformidade.")
                 st.write(f"**🔧 Panes Repetitivas (ATA):** {json_dash['panes_repetitivas']['dados']}")
                 st.write(f"**📈 Posição em Rankings:** {json_dash['ranking_indisponibilidade']['dados']}")
                 st.write(f"**📅 Antecedência de Paradas:** {json_dash['prazo_abertura']['dados']}")
-            except Exception as e:
-                st.error(f"Erro ao processar o dashboard: {e}")
+            except Exception as e: st.error(f"Erro: {e}")
 
-# ==========================================
-# ABA: CONTROLE ADMINISTRATIVO
-# ==========================================
+with aba_conhecimento:
+    st.header("📝 Treinar e Alimentar o Cérebro da IA")
+    arquivos_banco = st.file_uploader("Carregar manuais para o Banco de Dados:", type=["pdf", "txt", "xlsx"], accept_multiple_files=True, key="banco_up")
+    if arquivos_banco:
+        if st.button("🔄 Incorporar Arquivos ao Banco de Conhecimento"):
+            _, texto_novos_manuais = extrair_dados_multiplos_arquivos(arquivos_banco)
+            st.session_state.banco_conhecimento += f"\n\n[MANUAIS COMPLEMENTARES]:\n{texto_novos_manuais}"
+            st.success(f"✅ {len(arquivos_banco)} documento(s) indexado(s)!")
+    st.write("---")
+    texto_manual = st.text_area("Instruções em Texto:", value=st.session_state.banco_conhecimento, height=150)
+    if st.button("Salvar Regras"):
+        st.session_state.banco_conhecimento = texto_manual
+        st.success("Salvo.")
+
 with aba_admin:
     if st.session_state.usuario_logado == "fabio.ferreira@rina.org":
         st.header("⚙️ Gerenciamento de Alunos")
@@ -224,5 +220,4 @@ with aba_admin:
                     if st.button("Aprovar Aluno", key=email_p):
                         st.session_state.usuarios_db[email_p] = "aprovado"
                         st.rerun()
-        else:
-            st.info("Nenhuma solicitação pendente.")
+        else: st.info("Nenhuma solicitação pendente.")
