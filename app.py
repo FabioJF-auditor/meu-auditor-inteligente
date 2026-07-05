@@ -3,7 +3,6 @@ import pandas as pd
 import plotly.graph_objects as go
 from pypdf import PdfReader
 import google.generativeai as genai
-from openai import OpenAI
 import json
 import re
 from PIL import Image
@@ -12,10 +11,9 @@ import io
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Plataforma de Auditoria Avançada RINA", page_icon="✈️", layout="wide")
 
-# 2. CONFIGURAÇÃO DOS MOTORES DE IA (Puxando dos Secrets)
+# 2. CONFIGURAÇÃO DO MOTOR GEMINI PRO (Puxando dos Secrets)
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    client_openai = OpenAI(api_key=st.secrets.get("OPENAI_API_KEY", ""))
 except:
     pass
 
@@ -45,11 +43,11 @@ if st.session_state.usuario_logado is None:
     st.stop()
 
 # --- INTERFACE PRINCIPAL ---
-st.title("🚀 Hub de Inteligência Artificial Multimotor em Auditoria")
+st.title("🚀 Hub de Inteligência Artificial RINA — Alta Precisão (Gemini Pro)")
 st.write(f"**Auditor Responsável:** {st.session_state.usuario_logado}")
 
 aba_auditoria, aba_dashboard, aba_conhecimento, aba_admin = st.tabs([
-    "📋 Executar Checklist (ACC/ACCD/ACCI)", 
+    "📋 Executar Checklist Padrão RINA", 
     "📊 Analisar Apenas Dashboard (60 Dias)", 
     "📚 Enriquecer Base de IA", 
     "🛠️ Painel Admin"
@@ -70,107 +68,98 @@ def extrair_dados_multiplos_arquivos(arquivos):
             texto_acumulado += f"\n[Planilha {arquivo.name}]:\n{df.to_string()}\n"
     return conteudo_gemini, texto_acumulado
 
-def chamar_ia_selecionada(motor, prompt, lista_midia):
-    if motor == "Gemini 2.5 Flash":
-        model = genai.GenerativeModel('gemini-2.5-flash')
-        response = model.generate_content(lista_midia)
-        return response.text
-    elif motor == "GPT-4o (OpenAI)":
-        response = client_openai.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return response.choices[0].message.content
-    return ""
-
 # ==========================================
-# ABA: EXECUÇÃO DO CHECKLIST COM MOTOR SELECIONÁVEL
+# ABA: EXECUÇÃO DO CHECKLIST (SISTEMA GEMINI PRO)
 # ==========================================
 with aba_auditoria:
-    c1, c2, c3, c4 = st.columns(4)
-    with c1: prefixo = st.text_input("Prefixo:", value="PR-").strip().upper()
+    c1, c2, c3 = st.columns(3)
+    with c1: prefixo = st.text_input("Prefixo da Aeronave:", value="PR-").strip().upper()
     with c2: modelo = st.text_input("Modelo da Aeronave:").strip().upper()
-    with c3: escopo = st.selectbox("Escopo:", ["ACCD (Documental)", "ACC (Física/Documental)", "ACCI (Inicial)"])
-    with c4: motor_ia = st.selectbox("🧠 Escolha o Motor de Inteligência Artificial:", ["Gemini 2.5 Flash", "GPT-4o (OpenAI)"])
+    with c3: escopo = st.selectbox("Modalidade de Inspeção:", ["ACCD (Auditoria de Conformidade Contratual Documental)", "ACC (Auditoria de Conformidade Contratual - Física/Documental)", "ACCI (Auditoria de Conformidade Contratual Inicial)"])
 
     st.write("---")
-    arquivos_auditoria = st.file_uploader("Selecione um ou mais arquivos simultaneamente:", type=["pdf", "png", "jpg", "jpeg", "xlsx"], accept_multiple_files=True, key="aud_up")
+    arquivos_auditoria = st.file_uploader("Selecione os arquivos enviados pela operadora (PDFs, Fotos, Planilhas):", type=["pdf", "png", "jpg", "jpeg", "xlsx"], accept_multiple_files=True, key="aud_up")
 
     if arquivos_auditoria:
-        if st.button(f"🔍 Executar Checklist de Auditoria Avançado ({len(arquivos_auditoria)} arquivos)"):
-            st.info(f"⚙️ Processando análise através do motor {motor_ia}...")
+        if st.button(f"🔍 Rodar Auditoria de Alta Precisão ({len(arquivos_auditoria)} arquivos)"):
+            st.info("⚙️ Conectando ao motor de inteligência avançada Gemini Pro... Cruzando evidências...")
             
             lista_midia, texto_total = extrair_dados_multiplos_arquivos(arquivos_auditoria)
             
-            prompt_auditoria = f"""
-            Você é um Engenheiro de Aeronavegabilidade e Auditor Sênior especialista Petrobras/RINA.
-            Analise rigorosamente os dados da aeronave {prefixo} ({modelo}) no escopo {escopo}.
-            Base normativa de suporte: \"\"\"{st.session_state.banco_conhecimento}\"\"\"
+            # Prompt analítico ultra rigoroso ajustado para a inteligência profunda do Pro
+            prompt_auditoria_final = f"""
+            Você é um Engenheiro de Aeronavegabilidade e Auditor Sênior da RINA atuando em contrato Petrobras.
+            Sua tarefa é analisar as evidências e preencher rigorosamente o padrão de Checklist de Auditoria Documental para a aeronave {prefixo} ({modelo}) no escopo {escopo}.
+            Base normativa complementar: \"\"\"{st.session_state.banco_conhecimento}\"\"\"
 
-            Varra os documentos fornecidos buscando preencher com precisão milimétrica o checklist.
-            Para cada item, determine o status (CF para Conforme, NC para Não Conforme) e extraia dados textuais exatos do arquivo no campo 'info_checklist' (Validades exatas encontradas, datas de realização e dados numéricos coerentes).
+            Varra minuciosamente as imagens e os textos fornecidos. Identifique as validades e os dados reais.
+            Determine o Status de cada item estritamente como: 'CF' (Conforme) ou 'NC' (Não Conforme). 
+            No campo 'info_checklist', coloque de forma exata e literal as datas, validades e números de série que encontrar. 
+            No campo 'justificativa', apresente o parecer técnico fundamentado com rigor de auditoria.
 
-            Retorne um JSON puro, sem formatação markdown:
+            Retorne estritamente um objeto JSON puro (sem tags markdown ou caracteres extras):
             {{
-                "seguro_reta": {{"status": "CF", "info_checklist": "Texto com validades e adendos encontrados no documento", "justificativa": "Parecer técnico"}},
-                "aprs_assinaturas": {{"status": "CF", "info_checklist": "Dados de assinaturas e ordens de serviço identificadas", "justificativa": "Parecer técnico"}},
-                "rastreabilidade_pecas": {{"status": "CF", "info_checklist": "Dados do Form 1, part numbers e serial numbers analisados", "justificativa": "Parecer técnico"}},
-                "prazos_paradas": {{"status": "CF", "info_checklist": "Datas e contagem de dias identificadas nos cards", "justificativa": "Parecer técnico"}},
-                "gatilhos_vermelhos": 0, "gatilhos_amarelos": 0
+                "item_1": {{"item": "Seguro RETA e Validades de Portarias", "status": "CF", "info_checklist": "Inserir validades exatas e número de adendos encontrados", "justificativa": "Análise técnica fundamentada"}},
+                "item_2": {{"item": "Liberações Técnicas, Ordens de Serviço e Assinaturas (APRS/RII)", "status": "CF", "info_checklist": "Inserir datas de realização e dados das assinaturas identificadas", "justificativa": "Análise técnica fundamentada"}},
+                "item_3": {{"item": "Rastreabilidade de Componentes Classe I e II (Form 1 / FAA 8130-3)", "status": "CF", "info_checklist": "Inserir Part Numbers e Serial Numbers verificados nos documentos", "justificativa": "Análise técnica fundamentada"}},
+                "item_4": {{"item": "Certificado de Verificação de Aeronavegabilidade (CVA) e Validade do CA", "status": "CF", "info_checklist": "Inserir datas de vigência e conformidade regulamentar", "justificativa": "Análise técnica fundamentada"}},
+                "item_5": {{"item": "Análise de Histórico de Panes Repetitivas (ATA) - Janela de 60 Dias", "status": "CF", "info_checklist": "Inserir recorrências encontradas ou declaração de conformidade", "justificativa": "Análise técnica fundamentada"}},
+                "gatilhos_vermelhos": 0,
+                "gatilhos_amarelos": 0
             }}
-            Documentação recebida: {texto_total[:12000]}
+
+            Textos e Planilhas Extraídos:
+            {texto_total[:15000]}
             """
-            lista_midia.append(prompt_auditoria)
+            lista_midia.append(prompt_auditoria_final)
             
             try:
-                raw_response = chamar_ia_selecionada(motor_ia, prompt_auditoria, lista_midia)
-                res_clean = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", raw_response.strip()).strip()
+                # 🔄 ATIVAÇÃO DO MOTOR DE ALTA PRECISÃO GEMINI PRO
+                model_gemini = genai.GenerativeModel('gemini-2.5-pro')
+                response_pro = model_gemini.generate_content(lista_midia)
+                
+                res_clean = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", response_pro.text.strip()).strip()
                 res_json = json.loads(res_clean)
                 
-                st.success("📋 Resultados do Checklist Técnico Coletados!")
+                st.success("📋 Relatório de Checklist Técnico RINA Concluído!")
                 
-                # --- MONTAGEM DA TABELA DE DADOS PARA DOWNLOAD ---
-                dados_tabela = {
-                    "Item do Checklist": ["Seguro RETA e Validades", "Liberações e Assinaturas (APRS)", "Rastreabilidade (Form 1)", "Prazos e Alertas Contratuais"],
-                    "Status Analisado": [res_json["seguro_reta"]["status"], res_json["aprs_assinaturas"]["status"], res_json["rastreabilidade_pecas"]["status"], res_json["prazos_paradas"]["status"]],
-                    "Informações Coletadas (Validades/Datas)": [res_json["seguro_reta"]["info_checklist"], res_json["aprs_assinaturas"]["info_checklist"], res_json["rastreabilidade_pecas"]["info_checklist"], res_json["prazos_paradas"]["info_checklist"]],
-                    "Justificativa Técnica do Auditor IA": [res_json["seguro_reta"]["justificativa"], res_json["aprs_assinaturas"]["justificativa"], res_json["rastreabilidade_pecas"]["justificativa"], res_json["prazos_paradas"]["justificativa"]]
-                }
-                df_checklist_respondido = pd.DataFrame(dados_tabela)
+                # --- MONTAGEM DA TABELA FIEL PARA DOWNLOAD ---
+                lista_itens = [res_json[f"item_{i}"] for i in range(1, 6)]
+                df_checklist_respondido = pd.DataFrame(lista_itens)
+                df_checklist_respondido.columns = ["Item de Inspeção", "Status (CF/NC)", "Dados Coletados (Validades/Datas/Séries)", "Parecer Técnico Fundamentado"]
                 
                 output_excel = io.BytesIO()
                 with pd.ExcelWriter(output_excel, engine='openpyxl') as writer:
-                    df_checklist_respondido.to_excel(writer, index=False, sheet_name=f"Checklist {prefixo}")
+                    df_checklist_respondido.to_excel(writer, index=False, sheet_name="Checklist RINA")
                 dados_excel_bytes = output_excel.getvalue()
 
+                # Botão Oficial de Download em Excel
                 st.download_button(
-                    label="📥 Baixar Checklist Respondido em Excel (.xlsx)",
+                    label="📥 Baixar Checklist Oficial Respondido em Excel (.xlsx)",
                     data=dados_excel_bytes,
-                    file_name=f"Checklist_Auditoria_{prefixo}_{escopo}.xlsx",
+                    file_name=f"Checklist_Oficial_RINA_{prefixo}_{escopo}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
                 
                 st.write("---")
                 col_res1, col_res2 = st.columns(2)
                 with col_res1:
-                    def bloco(nome, obj):
+                    for i in range(1, 6):
+                        obj = res_json[f"item_{i}"]
                         simb = "🟢" if obj["status"] == "CF" else "🔴"
-                        with st.expander(f"{simb} {nome} [{obj['status']}]", expanded=True):
-                            st.write(f"**ℹ️ Dados do Documento (Validades/Datas):** *{obj['info_checklist']}*")
-                            st.write(f"**💬 Parecer da IA:** {obj['justificativa']}")
-                    bloco("Seguro RETA e Validades", res_json["seguro_reta"])
-                    bloco("Liberações e Assinaturas (APRS/RII)", res_json["aprs_assinaturas"])
-                    bloco("Rastreabilidade (Form 1)", res_json["rastreabilidade_pecas"])
-                    bloco("Prazos e Alertas Contratuais", res_json["prazos_paradas"])
+                        with st.expander(f"{simb} {obj['item']} — [{obj['status']}]", expanded=True):
+                            st.markdown(f"**ℹ️ Dados do Checklist:** *{obj['info_checklist']}*")
+                            st.markdown(f"**💬 Parecer Técnico Pro:** {obj['justificativa']}")
                 with col_res2:
-                    fig = go.Figure(data=[go.Bar(x=["Críticos", "Alertas"], y=[int(res_json["gatilhos_vermelhos"]), int(res_json["gatilhos_amarelos"])], marker_color=['#EF553B', '#FF9900'])])
-                    fig.update_layout(template="plotly_white", height=300)
+                    fig = go.Figure(data=[go.Bar(x=["Não Conformidades (NC)", "Alertas"], y=[int(res_json["gatilhos_vermelhos"]), int(res_json["gatilhos_amarelos"])], marker_color=['#EF553B', '#FF9900'])])
+                    fig.update_layout(template="plotly_white", height=350)
                     st.plotly_chart(fig, use_container_width=True)
+                    
             except Exception as e:
-                st.error(f"Erro no processamento multimotor. Detalhes: {e}")
+                st.error(f"Erro no processamento do motor Gemini Pro. Detalhes: {e}")
 
 # ==========================================
-# OUTRAS ABAS MANTIDAS
+# OUTRAS ABAS ADAPTADAS PARA O GEMINI PRO
 # ==========================================
 with aba_dashboard:
     st.header("📊 Análise de Tendências e Janela de 60 Dias")
@@ -182,7 +171,7 @@ with aba_dashboard:
             prompt_dash = f"Analise a evidência buscando eventos críticos operacionais em 60 dias (TOP 10, TOP 3, prazos). Retorne JSON puro:\n{{\"panes_repetitivas\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"ranking_indisponibilidade\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"prazo_abertura\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"critico\": 0}}\nTexto: {texto_dash[:10000]}"
             midias.append(prompt_dash)
             try:
-                model = genai.GenerativeModel('gemini-2.5-flash')
+                model = genai.GenerativeModel('gemini-2.5-pro')
                 res_dash = model.generate_content(midias)
                 clean_dash = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", res_dash.text.strip()).strip()
                 json_dash = json.loads(clean_dash)
