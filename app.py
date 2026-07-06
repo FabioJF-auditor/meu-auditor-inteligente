@@ -49,7 +49,7 @@ aba_auditoria, aba_dashboard, aba_conhecimento, aba_admin = st.tabs([
     "🛠️ Painel Admin"
 ])
 
-# Função para converter imagem PIL para base64 para envio via API nativa
+# Função para extrair textos e preparar imagens para envio via API nativa
 def extrair_dados_multiplos_arquivos(arquivos):
     conteudo_imagens_api = []
     texto_acumulado = ""
@@ -84,17 +84,17 @@ def extrair_dados_multiplos_arquivos(arquivos):
                 pass
     return conteudo_imagens_api, texto_acumulado
 
-# Função de Conexão Direta HTTP com a API estável v1 do Gemini
+# Função de Conexão Direta HTTP com o modelo gemini-pro (v1 estável)
 def chamar_gemini_via_http(prompt, imagens_api):
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
     except:
         return "Erro: Chave secreta GEMINI_API_KEY não encontrada no Streamlit."
         
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
+    # Alterado para a rota oficial e estável do modelo gemini-pro
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     
-    # Monta as partes da requisição (Imagens + Texto do Prompt)
     parts = []
     for img_part in imagens_api:
         parts.append(img_part)
@@ -148,7 +148,7 @@ with aba_auditoria:
             {{
                 "item_1": {{"item": "Seguro RETA e Validades de Portarias", "status": "CF", "info_checklist": "Validades exatas e número de adendos encontrados", "justificativa": "Análise técnica fundamentada"}},
                 "item_2": {{"item": "Liberações Técnicas, Ordens de Serviço e Assinaturas (APRS/RII)", "status": "CF", "info_checklist": "Datas de realização e dados das assinaturas identificadas", "justificativa": "Análise técnica fundamentada"}},
-                "item_3": {{"item": "Rastreabilidade de Componentes Classe I e II (Form 1 / FAA 8130-3)", "status": "CF", "info_checklist": "Part Numbers e Serial Numbers verificados nos documentos", "justificativa": "Análise técnica fundamentada"}},
+                "item_3": {{"item": "Rastreabilidade de Componentes Classe I e II (Form 1 / FAA 8130-3)", "status": "CF", "info_checklist": "Part Numbers e Serial Numbers verificados nos documents", "justificativa": "Análise técnica fundamentada"}},
                 "item_4": {{"item": "Certificado de Verificação de Aeronavegabilidade (CVA) e Validade do CA", "status": "CF", "info_checklist": "Datas de vigência e conformidade regulamentar", "justificativa": "Análise técnica fundamentada"}},
                 "item_5": {{"item": "Análise de Histórico de Panes Repetitivas (ATA) - Janela de 60 Dias", "status": "CF", "info_checklist": "Recorrências encontradas ou declaração de conformidade", "justificativa": "Análise técnica fundamentada"}},
                 "gatilhos_vermelhos": 0,
@@ -224,7 +224,7 @@ with aba_dashboard:
                 st.error(resposta_dash)
             else:
                 try:
-                    clean_dash = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", resposta_dash.text.strip()).strip() if hasattr(resposta_dash, 'text') else re.sub(r"^```[a-zA-Z]*\n|\n```$", "", resposta_dash.strip()).strip()
+                    clean_dash = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", resposta_dash.strip()).strip()
                     json_dash = json.loads(clean_dash)
                     st.subheader("🚨 Diagnóstico de Alertas Operacionais")
                     if json_dash["critico"] == 1: st.error("⚠️ ALERTA: Esta aeronave atingiu gatilhos críticos!")
