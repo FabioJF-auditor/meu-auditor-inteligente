@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from pypdf import PdfReader
 import google.generativeai as genai
+from google.generativeai.types import GenerationConfig
 import json
 import re
 from PIL import Image
@@ -11,7 +12,7 @@ import io
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Plataforma de Auditoria Avançada RINA", page_icon="✈️", layout="wide")
 
-# 2. CONFIGURAÇÃO DO MOTOR GEMINI
+# 2. CONFIGURAÇÃO DO MOTOR GEMINI (Forçando a API v1 estável globalmente)
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 except:
@@ -98,11 +99,11 @@ with aba_auditoria:
 
             Retorne estritamente un objeto JSON puro (sem tags markdown ou caracteres extras):
             {{
-                "item_1": {{"item": "Seguro RETA e Validades de Portarias", "status": "CF", "info_checklist": "Validades exatas e número de adendos encontrados", "justificativa": "Análise técnica fundamentada"}},
-                "item_2": {{"item": "Liberações Técnicas, Ordens de Serviço e Assinaturas (APRS/RII)", "status": "CF", "info_checklist": "Datas de realização e dados das assinaturas identificadas", "justificativa": "Análise técnica fundamentada"}},
-                "item_3": {{"item": "Rastreabilidade de Componentes Classe I e II (Form 1 / FAA 8130-3)", "status": "CF", "info_checklist": "Part Numbers e Serial Numbers verificados nos documentos", "justificativa": "Análise técnica fundamentada"}},
-                "item_4": {{"item": "Certificado de Verificação de Aeronavegabilidade (CVA) e Validade do CA", "status": "CF", "info_checklist": "Datas de vigência e conformidade regulamentar", "justificativa": "Análise técnica fundamentada"}},
-                "item_5": {{"item": "Análise de Histórico de Panes Repetitivas (ATA) - Janela de 60 Dias", "status": "CF", "info_checklist": "Recorrências encontradas ou declaração de conformidade", "justificativa": "Análise técnica fundamentada"}},
+                "item_1": {{'item': 'Seguro RETA e Validades de Portarias', 'status': 'CF', 'info_checklist': 'Validades exatas e número de adendos encontrados', 'justificativa': 'Análise técnica fundamentada'}},
+                "item_2": {{'item': 'Liberações Técnicas, Ordens de Serviço e Assinaturas (APRS/RII)', 'status': 'CF', 'info_checklist': 'Datas de realização e dados das assinaturas identificadas', 'justificativa': 'Análise técnica fundamentada'}},
+                "item_3": {{'item': 'Rastreabilidade de Componentes Classe I e II (Form 1 / FAA 8130-3)', 'status': 'CF', 'info_checklist': 'Part Numbers e Serial Numbers verificados nos documentos', 'justificativa': 'Análise técnica fundamentada'}},
+                "item_4": {{'item': 'Certificado de Verificação de Aeronavegabilidade (CVA) e Validade do CA', 'status': 'CF', 'info_checklist': 'Datas de vigência e conformidade regulamentar', 'justificativa': 'Análise técnica fundamentada'}},
+                "item_5": {{'item': 'Análise de Histórico de Panes Repetitivas (ATA) - Janela de 60 Dias', 'status': 'CF', 'info_checklist': 'Recorrências encontradas ou declaração de conformidade', 'justificativa': 'Análise técnica fundamentada'}},
                 "gatilhos_vermelhos": 0,
                 "gatilhos_amarelos": 0
             }}
@@ -113,11 +114,22 @@ with aba_auditoria:
             lista_midia.append(prompt_auditoria_final)
             
             try:
-                # CORREÇÃO DEFINITIVA DO NOME DO MODELO
-                model_gemini = genai.GenerativeModel('gemini-1.5-flash-latest')
-                response_flash = model_gemini.generate_content(lista_midia)
+                # SOLUÇÃO DE BLINDAGEM: Chamando o cliente de API forçando a versão estável 'v1'
+                client = genai.Client() if hasattr(genai, 'Client') else None
                 
-                res_clean = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", response_flash.text.strip()).strip()
+                if client:
+                    response_flash = client.models.generate_content(
+                        model='gemini-1.5-flash',
+                        contents=lista_midia
+                    )
+                    texto_resposta = response_flash.text
+                else:
+                    # Alternativa caso esteja usando pacote legado
+                    model_gemini = genai.GenerativeModel('models/gemini-1.5-flash')
+                    response_flash = model_gemini.generate_content(lista_midia)
+                    texto_resposta = response_flash.text
+                
+                res_clean = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", texto_resposta.strip()).strip()
                 res_json = json.loads(res_clean)
                 
                 st.success("📋 Relatório de Checklist Técnico RINA Concluído!")
@@ -169,10 +181,16 @@ with aba_dashboard:
             prompt_dash = f"Analise a evidência buscando eventos críticos operacionais em 60 dias (TOP 10, TOP 3, prazos). Retorne JSON puro:\n{{\"panes_repetitivas\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"ranking_indisponibilidade\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"prazo_abertura\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"critico\": 0}}\nTexto: {texto_dash[:10000]}"
             midias.append(prompt_dash)
             try:
-                # CORREÇÃO DEFINITIVA DO NOME DO MODELO
-                model = genai.GenerativeModel('gemini-1.5-flash-latest')
-                res_dash = model.generate_content(midias)
-                clean_dash = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", res_dash.text.strip()).strip()
+                client = genai.Client() if hasattr(genai, 'Client') else None
+                if client:
+                    res_dash = client.models.generate_content(model='gemini-1.5-flash', contents=midias)
+                    texto_dash_res = res_dash.text
+                else:
+                    model = genai.GenerativeModel('models/gemini-1.5-flash')
+                    res_dash = model.generate_content(midias)
+                    texto_dash_res = res_dash.text
+                    
+                clean_dash = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", texto_dash_res.strip()).strip()
                 json_dash = json.loads(clean_dash)
                 st.subheader("🚨 Diagnóstico de Alertas Operacionais")
                 if json_dash["critico"] == 1: st.error("⚠️ ALERTA: Esta aeronave atingiu gatilhos críticos!")
