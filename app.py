@@ -246,19 +246,179 @@ with tab_auditoria:
             imagens, texto_arquivos = extrair_dados_multiplos_arquivos(arquivos_auditoria)
             
             prompt_auditoria = f"""
-            Você é um Engenheiro de Aeronavegabilidade e Auditor Líder da RINA atuando no contrato Petrobras.
-            Sua missão é analisar de forma ultra fiel as evidências enviadas e preencher o checklist técnico para a aeronave {prefixo_maquina} ({modelo_helicoptero}) no escopo {escopo_inspecao} sob as diretrizes de busca da {escopo_norma}.
+Você é um Engenheiro de Aeronavegabilidade e Auditor Líder da RINA atuando no contrato Petrobras.
+Sua missão é analisar de forma ultra fiel as evidências enviadas e preencher o checklist técnico para a aeronave {prefixo_maquina} ({modelo_helicoptero}) no escopo {escopo_inspecao} sob as diretrizes de busca da {escopo_norma}.
+
+Regras de Negócio e Conhecimento Técnico Interno Fiel:
+{st.session_state.banco_conhecimento}
+
+Varra os arquivos anexados buscando as validades literais e dados numéricos coerentes. Se necessário, utilize a ferramenta de pesquisa integrada do Google para validar portarias ou prazos de normas citadas.
+Para cada item, determine o Status estritamente como: 'CF' (Conforme) ou 'NC' (Não Conforme). No campo 'info_checklist', coloque de forma exata, literal e resumida as datas de validade, Part Numbers (PN) e Serial Numbers (SN) que encontrar. Não invente nada.
+
+Retorne estritamente um objeto JSON puro, sem formatação markdown ou blocos de código:
+{{
+    "item_1": {{"item": "Seguro RETA e Validade das Apólices Obrigatórias", "status": "CF", "info_checklist": "Texto literal encontrado", "justificativa": "Parecer técnico"}},
+    "item_2": {{"item": "Liberações Técnicas, Ordens de Serviço e Assinaturas de APRS/RII", "status": "CF", "info_checklist": "Texto literal encontrado", "justificativa": "Parecer técnico"}},
+    "item_3": {{"item": "Rastreabilidade de Componentes Críticos Classe I e II (Form 1 / FAA 8130-3)", "status": "CF", "info_checklist": "PNs e SNs verificados", "justificativa": "Parecer técnico"}},
+    "item_4": {{"item": "Certificado de Verificação de Aeronavegabilidade (CVA) e Validade do CA", "status": "CF", "info_checklist": "Datas de vigência", "justificativa": "Parecer técnico"}},
+    "item_5": {{"item": "Controle de Prazos e Alertas da Janela de Panes de 60 Dias", "status": "CF", "info_checklist": "Resultados de recorrência identificados", "justificativa": "Parecer técnico"}},
+    "gatilhos_vermelhos": 0,
+    "gatilhos_amarelos": 0
+}}
+
+Dados textuais extraídos:
+{texto_arquivos[:14000]}
+"""
             
-            Regras de Negócio e Conhecimento Técnico Interno Fiel:
-            \"\"\"{st.session_state.banco_conhecimento}\"\"\"
+            resposta_agente = executar_chamada_gemini(prompt_auditoria, imagens)
+            
+            try:
+                res_clean = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", resposta_agente.strip()).strip()
+                res_json = json.loads(res_clean)
+                st.success("📋 Relatório de Checklist Técnico RINA Consolidado!")
+                
+                lista_itens = [res_json[f"item_{i}"] for i in range(1, 6)]
+                df_excel = pd.DataFrame(lista_itens)
+                df_excel.columns = ["Item do Checklist Oficial RINA", "Status Operacional", "Dados e Validades Coletadas (Fiel)", "Justificativa"]
+                
+                buffer_excel = io.BytesIO()
+                with pd.ExcelWriter(buffer_excel, engine='openpyxl') as writer:
+                    df_excel.to_excel(writer, index=False, sheet_name=f"Checklist {prefixo_maquina}")
+                
+                st.download_button(
+                    label="📥 Baixar Checklist Oficial Respondido em Excel (.xlsx)",
+                    data=buffer_excel.getvalue(),
+                    file_name=f"Checklist_RINA_Oficial_{prefixo_maquina}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+                
+                st.write("---")
+                col_res1, col_res2 = st.columns(2)
+                with col_res1:
+                    for i in range(1, 6):
+                        obj = res_json[f"item_{i}"]
+                        simb = "🟢" if obj["status"] == "CF" else "🔴"
+                        with st.expander(f"{simb} {obj['item']} — [{obj['status']}]", expanded=True):
+                            st.markdown(f"**ℹ️ Evidência Documental:** *{obj['info_checklist']}*")
+                            st.markdown(f"**💬 Julgamento Técnico:** {obj['justificativa']}")
+                with col_res2:
+                    fig = go.Figure(data=[go.Bar(x=["Não Conformidades (NC)", "Alertas Técnicos"], y=[int(res_json["gatilhos_vermelhos"]), int(res_json["gatilhos_amarelos"])], marker_color=['#d9534f', '#f0ad4e'])])
+                    fig.update_layout(template="plotly_white", height=350)
+                    st.plotly_chart(fig, use_container_width=True)
+            except Exception as e:
+                st.error("Erro no processamento estruturado. Veja o retorno bruto:")
+                st.code(resposta_agente)
 
-            Varra os arquivos anexados buscando as validades literais e dados numéricos coerentes. Se necessário, utilize a ferramenta de pesquisa integrada do Google para validar portarias ou prazos de normas citadas.
-            Para cada item, determine o Status estritamente como: 'CF' (Conforme) ou 'NC' (Não Conforme). No campo 'info_checklist', coloque de forma exata, literal e resumida as datas de validade, Part Numbers (PN) e Serial Numbers (SN) que encontrar. Não invente nada.
+# ------------------------------------------
+# ABA 2: EMISSÃO DE DOCUMENTOS OFICIAIS (RAA / RNC)
+# ------------------------------------------
+with tab_documentos:
+    st.header("📄 Módulo de Geração de Documentos Técnicos")
+    sub_raa, sub_rnc = st.tabs(["📋 RAA (Relatório de Auditoria)", "⚠️ RNC (Registro de Não Conformidade)"])
+    
+    with sub_raa:
+        st.subheader("Gerar Novo RAA Corporativo")
+        c_pref = st.text_input("Prefixo Regulamentar:", value="PR-", key="raa_pref")
+        c_op = st.text_input("Operadora de Logística Offshore:", value="Ex: Omni, Líder, CHC")
+        c_text = st.text_area("Conclusão Técnica e Parecer Final:")
+        
+        if st.button("💾 Chancelar e Assinar RAA"):
+            novo_raa = {"Aeronave": c_pref, "Operadora": c_op, "Parecer Técnico": c_text, "Auditor Líder": st.session_state.usuario_logado}
+            st.session_state.historico_raa.append(novo_raa)
+            st.success(f"✅ RAA para a aeronave {c_pref} chancelado e gravado!")
+            
+        if st.session_state.historico_raa:
+            st.write("---")
+            st.dataframe(pd.DataFrame(st.session_state.historico_raa))
 
-            Retorne estritamente um objeto JSON puro, sem formatação markdown ou blocos de código ```json:
-            {{
-                "item_1": {{"item": "Seguro RETA e Validade das Apólices Obrigatórias", "status": "CF", "info_checklist": "Texto literal encontrado", "justificativa": "Parecer técnico"}},
-                "item_2": {{"item": "Liberações Técnicas, Ordens de Serviço e Assinaturas de APRS/RII", "status": "CF", "info_checklist": "Texto literal encontrado", "justificativa": "Parecer técnico"}},
-                "item_3": {{"item": "Rastreabilidade de Componentes Críticos Classe I e II (Form 1 / FAA 8130-3)", "status": "CF", "info_checklist": "PNs e SNs verificados", "justificativa": "Parecer técnico"}},
-                "item_4": {{"item": "Certificado de Verificação de Aeronavegabilidade (CVA) e Validade do CA", "status": "CF", "info_checklist": "Datas de vigência", "justificativa": "Parecer técnico"}},
-                "item_5": {{"item": "Controle de Prazos e Alertas da Janela de Panes de
+    with sub_rnc:
+        st.subheader("Abertura de Registro de Não Conformidade (RNC)")
+        r_pref = st.text_input("Prefixo da Aeronave Bloqueada:", value="PR-", key="rnc_pref")
+        r_item = st.selectbox("Item do Desvio Técnico:", ["Seguro RETA Vencido", "Rastreabilidade Incompleta Form 1", "Assinatura APRS Inexistente", "Estouro de Gatilho de Paradas de 60 Dias"])
+        r_text = st.text_area("Descrição Detalhada e Evidência Física/Documental:")
+        
+        if st.button("🚨 Emitir e Protocolar RNC"):
+            nova_rnc = {"Aeronave Infratora": r_pref, "Desvio Regulamentar": r_item, "Descrição da Evidência": r_text, "Responsável": st.session_state.usuario_logado}
+            st.session_state.historico_rnc.append(nova_rnc)
+            st.error(f"🔴 RNC Protocolada! Aeronave {r_pref} sinalizada com restrição.")
+            
+        if st.session_state.historico_rnc:
+            st.write("---")
+            st.dataframe(pd.DataFrame(st.session_state.historico_rnc))
+
+# ------------------------------------------
+# ABA 3: PAINEL DE PERFORMANCE (JANELA DE 60 DIAS)
+# ------------------------------------------
+with tab_dashboard:
+    st.header("📊 Monitoramento de Confiabilidade e Janela de 60 Dias")
+    st.write("Acompanhamento de indisponibilidade de frota, panes repetitivas de sistemas (ATA) e histórico de paradas.")
+    
+    arquivo_painel = st.file_uploader("Insira a Planilha de Disponibilidade ou Imagem do Painel de Indicadores de 60 dias:", type=["pdf", "xlsx", "png", "jpg"], key="up_dash")
+    
+    if arquivo_painel:
+        if st.button("📊 Análise do Dashboard"):
+            simular_voo_pairado("Módulo de Confiabilidade")
+            midias, texto_dash = extrair_dados_multiplos_arquivos([arquivo_painel])
+            
+            prompt_dash = f"""
+            Analise a evidência técnica buscando desvios críticos operacionais em 60 dias. 
+            Busque picos de indisponibilidade e recorrência de falhas em sistemas ATA. 
+            Retorne obrigatoriamente um JSON puro, sem markdown:
+            {{"panes_repetitivas": {{"status": "CF", "dados": "Descrição analítica das panes"}}, "ranking_indisponibilidade": {{"status": "CF", "dados": "Impacto percentual"}}, "critico": 0}}
+            Texto extraído: {texto_dash[:8000]}
+            """
+            
+            resposta_dash = executar_chamada_gemini(prompt_dash, midias)
+            try:
+                clean_dash = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", resposta_dash.strip()).strip()
+                json_dash = json.loads(clean_dash)
+                st.subheader("🚨 Diagnóstico de Alertas Operacionais")
+                if json_dash["critico"] == 1:
+                    st.error("⚠️ ALERTA CRÍTICO: Esta aeronave ultrapassou os limites contratuais na janela de 60 dias!")
+                else:
+                    st.success("🟢 Indicadores de performance operacional em conformidade.")
+                st.write(f"**🔧 Análise de Sistemas ATA (Falhas):** {json_dash['panes_repetitivas']['dados']}")
+                st.write(f"**📈 Posição em Rankings de Indisponibilidade:** {json_dash['ranking_indisponibilidade']['dados']}")
+            except Exception as e:
+                st.error("Falha ao estruturar os dados analíticos do painel.")
+                st.code(resposta_dash)
+
+# ------------------------------------------
+# ABA 4: BASE DE CONHECIMENTO E ARQUIVOS (SISTEMA RAG)
+# ------------------------------------------
+with tab_conhecimento:
+    st.header("📚 Treinamento Base do Sistema de Auditoria (Motor RAG)")
+    st.write("Alimente a memória local carregando manuais, portarias, PE da Petrobras ou regulamentos RINA.")
+    
+    arquivos_manuais = st.file_uploader("Selecione os Manuais Técnicos Oficiais (PDF, TXT ou XLSX):", accept_multiple_files=True, type=["pdf", "txt", "xlsx"], key="up_banco")
+    if arquivos_manuais:
+        if st.button("🔄 Indexar Documentos na Memória Ativa"):
+            _, novos_textos = extrair_dados_multiplos_arquivos(arquivos_manuais)
+            st.session_state.banco_conhecimento += f"\n\n[MANUAIS TÉCNICOS COMPLEMENTARES INDEXADOS]:\n{novos_textos}"
+            st.success(f"✅ {len(arquivos_manuais)} documento(s) técnico(s) acoplado(s) com sucesso!")
+            
+    st.write("---")
+    regras_texto = st.text_area("Regras e Diretrizes Ativas no Cérebro do Aplicativo:", value=st.session_state.banco_conhecimento, height=200)
+    if st.button("Salvar Modificações de Diretrizes"):
+        st.session_state.banco_conhecimento = regras_texto
+        st.success("🧠 Diretrizes operacionais atualizadas!")
+
+# ------------------------------------------
+# ABA 5: GESTÃO DE ACESSOS (PAINEL DO SUPERVISOR)
+# ------------------------------------------
+with tab_admin:
+    if st.session_state.usuario_logado == "fabio.ferreira@rina.org":
+        st.header("🛠️ Painel de Comando do Supervisor Fabio Ferreira")
+        usuarios_pendentes = [email for email, status in st.session_state.usuarios_db.items() if status == "pendente"]
+        if usuarios_pendentes:
+            for email_p in usuarios_pendentes:
+                col_m, col_b = st.columns([3, 1])
+                with col_m: st.text(email_p)
+                with col_b:
+                    if st.button("Aprovar Inspetor / Aluno", key=email_p):
+                        st.session_state.usuarios_db[email_p] = "aprovado"
+                        st.rerun()
+        else:
+            st.info("Nenhuma solicitação de acesso pendente na torre de controle.")
+    else:
+        st.warning("🔒 Acesso restrito. Uso exclusivo do Supervisor Fabio Ferreira.")
