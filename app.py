@@ -113,8 +113,8 @@ with aba_auditoria:
             lista_midia.append(prompt_auditoria_final)
             
             try:
-                # 🛠️ CAMINHO CLÁSSICO OBRIGATÓRIO PARA BIBLIOTECAS LEGADAS
-                model_gemini = genai.GenerativeModel('models/gemini-1.5-flash')
+                # Com a biblioteca atualizada no requirements.txt, esta chamada limpa passa a ser aceita de forma nativa
+                model_gemini = genai.GenerativeModel('gemini-1.5-flash')
                 response_flash = model_gemini.generate_content(lista_midia)
                 
                 res_clean = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", response_flash.text.strip()).strip()
@@ -169,8 +169,7 @@ with aba_dashboard:
             prompt_dash = f"Analise a evidência buscando eventos críticos operacionais em 60 dias (TOP 10, TOP 3, prazos). Retorne JSON puro:\n{{\"panes_repetitivas\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"ranking_indisponibilidade\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"prazo_abertura\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"critico\": 0}}\nTexto: {texto_dash[:10000]}"
             midias.append(prompt_dash)
             try:
-                # 🛠️ CAMINHO CLÁSSICO OBRIGATÓRIO PARA BIBLIOTECAS LEGADAS
-                model = genai.GenerativeModel('models/gemini-1.5-flash')
+                model = genai.GenerativeModel('gemini-1.5-flash')
                 res_dash = model.generate_content(midias)
                 clean_dash = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", res_dash.text.strip()).strip()
                 json_dash = json.loads(clean_dash)
