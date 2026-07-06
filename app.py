@@ -255,7 +255,7 @@ Regras de Negócio e Conhecimento Técnico Interno Fiel:
 Varra os arquivos anexados buscando as validades literais e dados numéricos coerentes. Se necessário, utilize a ferramenta de pesquisa integrada do Google para validar portarias ou prazos de normas citadas.
 Para cada item, determine o Status estritamente como: 'CF' (Conforme) ou 'NC' (Não Conforme). No campo 'info_checklist', coloque de forma exata, literal e resumida as datas de validade, Part Numbers (PN) e Serial Numbers (SN) que encontrar. Não invente nada.
 
-Retorne estritamente um objeto JSON puro, sem formatação markdown ou blocos de código:
+Retorne estritamente um objeto JSON puro, sem formatação markdown ou blocks de código:
 {{
     "item_1": {{"item": "Seguro RETA e Validade das Apólices Obrigatórias", "status": "CF", "info_checklist": "Texto literal encontrado", "justificativa": "Parecer técnico"}},
     "item_2": {{"item": "Liberações Técnicas, Ordens de Serviço e Assinaturas de APRS/RII", "status": "CF", "info_checklist": "Texto literal encontrado", "justificativa": "Parecer técnico"}},
@@ -400,8 +400,8 @@ with tab_conhecimento:
     st.write("---")
     regras_texto = st.text_area("Regras e Diretrizes Ativas no Cérebro do Aplicativo:", value=st.session_state.banco_conhecimento, height=200)
     if st.button("Salvar Modificações de Diretrizes"):
-        st.session_state.banco_conhecimento = regras_texto
-        st.success("🧠 Diretrizes operacionais atualizadas!")
+        st.session_state.banco_conhecimento = regras_texto  # LINHA CORRIGIDA AQUI
+        st.success("🧠 Diretrizes operacionais updated!")
 
 # ------------------------------------------
 # ABA 5: GESTÃO DE ACESSOS (PAINEL DO SUPERVISOR)
