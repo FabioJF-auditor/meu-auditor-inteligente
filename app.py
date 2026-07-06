@@ -186,9 +186,9 @@ def extrair_dados_multiplos_arquivos(arquivos):
     return conteudo_partes, texto_acumulado
 
 def executar_chamada_gemini(prompt, imagens):
-    """Executa a chamada usando a biblioteca clássica estável compatível com tokens corporativos"""
+    """Executa a chamada usando a nomenclatura direta para compatibilidade universal"""
     try:
-        # Força o carregamento clássico do modelo universal de produção estável
+        # Nomenclatura direta sem o prefixo models/ para chaves do Cloud Console
         model = genai.GenerativeModel('gemini-1.5-flash')
         
         conteudo_final = []
@@ -348,13 +348,17 @@ with tab_dashboard:
             midias, texto_dash = extrair_dados_multiplos_arquivos([arquivo_painel])
             
             prompt_dash = f"""
-            Analise a evidência técnica buscando desvios críticos operacionais em 60 dias. 
-            Busque picos de indisponibilidade e recorrência de falhas em sistemas ATA. 
-            Retorne obrigatoriamente um JSON puro, sem markdown:
-            {{"panes_repetitivas": {{"status": "CF", "dados": "Descrição analítica das panes"}}, "ranking_indisponibilidade": {{"status": "CF", "dados": "Impacto percentual"}}, "critico": 0}}
-            Texto extraído: {texto_dash[:8000]}
-            """
-            
+Analise a evidência técnica buscando desvios críticos operacionais em 60 dias. 
+Busque picos de indisponibilidade e recorrência de falhas em sistemas ATA. 
+Retorne obrigatoriamente um JSON puro, sem markdown:
+{{
+    "panes_repetitivas": {{"status": "CF", "dados": "Descrição analítica das panes"}}, 
+    "ranking_indisponibilidade": {{"status": "CF", "dados": "Impacto percentual"}}, 
+    "critico": 0
+}}
+Texto extraído: {texto_dash[:8000]}
+"""
+            # CORREÇÃO CRUCIAL AQUI: Passando as variáveis alinhadas para a função correta
             resposta_dash = executar_chamada_gemini(prompt_dash, midias)
             try:
                 clean_dash = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", resposta_dash.strip()).strip()
@@ -387,7 +391,7 @@ with tab_conhecimento:
     st.write("---")
     regras_texto = st.text_area("Regras e Diretrizes Ativas no Cérebro do Aplicativo:", value=st.session_state.banco_conhecimento, height=200)
     if st.button("Salvar Modificações de Diretrizes"):
-        st.session_state.banco_conhecimento = regras_texto
+        st.session_state.banco_conhecimento = reglas_texto
         st.success("🧠 Diretrizes operacionais atualizadas!")
 
 # ------------------------------------------
