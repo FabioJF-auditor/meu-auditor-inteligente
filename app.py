@@ -11,7 +11,7 @@ import io
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Plataforma de Auditoria Avançada RINA", page_icon="✈️", layout="wide")
 
-# 2. CONFIGURAÇÃO DO MOTOR GEMINI PRO (Puxando dos Secrets)
+# 2. CONFIGURAÇÃO DO MOTOR GEMINI (Utilizando o estável 1.5-flash para evitar erros de cota)
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 except:
@@ -43,7 +43,7 @@ if st.session_state.usuario_logado is None:
     st.stop()
 
 # --- INTERFACE PRINCIPAL ---
-st.title("🚀 Hub de Inteligência Artificial RINA — Alta Precisão (Gemini Pro)")
+st.title("🚀 Hub de Inteligência Artificial RINA — Auditoria Automatizada")
 st.write(f"**Auditor Responsável:** {st.session_state.usuario_logado}")
 
 aba_auditoria, aba_dashboard, aba_conhecimento, aba_admin = st.tabs([
@@ -69,7 +69,7 @@ def extrair_dados_multiplos_arquivos(arquivos):
     return conteudo_gemini, texto_acumulado
 
 # ==========================================
-# ABA: EXECUÇÃO DO CHECKLIST (SISTEMA GEMINI PRO)
+# ABA: EXECUÇÃO DO CHECKLIST (MOTOR FLASH SEM TRAVAMENTOS)
 # ==========================================
 with aba_auditoria:
     c1, c2, c3 = st.columns(3)
@@ -81,12 +81,11 @@ with aba_auditoria:
     arquivos_auditoria = st.file_uploader("Selecione os arquivos enviados pela operadora (PDFs, Fotos, Planilhas):", type=["pdf", "png", "jpg", "jpeg", "xlsx"], accept_multiple_files=True, key="aud_up")
 
     if arquivos_auditoria:
-        if st.button(f"🔍 Rodar Auditoria de Alta Precisão ({len(arquivos_auditoria)} arquivos)"):
-            st.info("⚙️ Conectando ao motor de inteligência avançada Gemini Pro... Cruzando evidências...")
+        if st.button(f"🔍 Rodar Auditoria Otimizada ({len(arquivos_auditoria)} arquivos)"):
+            st.info("⚙️ Processando evidências através do motor Gemini Flash... Cruzando dados...")
             
             lista_midia, texto_total = extrair_dados_multiplos_arquivos(arquivos_auditoria)
             
-            # Prompt analítico ultra rigoroso ajustado para a inteligência profunda do Pro
             prompt_auditoria_final = f"""
             Você é um Engenheiro de Aeronavegabilidade e Auditor Sênior da RINA atuando em contrato Petrobras.
             Sua tarefa é analisar as evidências e preencher rigorosamente o padrão de Checklist de Auditoria Documental para a aeronave {prefixo} ({modelo}) no escopo {escopo}.
@@ -99,11 +98,11 @@ with aba_auditoria:
 
             Retorne estritamente um objeto JSON puro (sem tags markdown ou caracteres extras):
             {{
-                "item_1": {{"item": "Seguro RETA e Validades de Portarias", "status": "CF", "info_checklist": "Inserir validades exatas e número de adendos encontrados", "justificativa": "Análise técnica fundamentada"}},
-                "item_2": {{"item": "Liberações Técnicas, Ordens de Serviço e Assinaturas (APRS/RII)", "status": "CF", "info_checklist": "Inserir datas de realização e dados das assinaturas identificadas", "justificativa": "Análise técnica fundamentada"}},
-                "item_3": {{"item": "Rastreabilidade de Componentes Classe I e II (Form 1 / FAA 8130-3)", "status": "CF", "info_checklist": "Inserir Part Numbers e Serial Numbers verificados nos documentos", "justificativa": "Análise técnica fundamentada"}},
-                "item_4": {{"item": "Certificado de Verificação de Aeronavegabilidade (CVA) e Validade do CA", "status": "CF", "info_checklist": "Inserir datas de vigência e conformidade regulamentar", "justificativa": "Análise técnica fundamentada"}},
-                "item_5": {{"item": "Análise de Histórico de Panes Repetitivas (ATA) - Janela de 60 Dias", "status": "CF", "info_checklist": "Inserir recorrências encontradas ou declaração de conformidade", "justificativa": "Análise técnica fundamentada"}},
+                "item_1": {{"item": "Seguro RETA e Validades de Portarias", "status": "CF", "info_checklist": "Validades exatas e número de adendos encontrados", "justificativa": "Análise técnica fundamentada"}},
+                "item_2": {{"item": "Liberações Técnicas, Ordens de Serviço e Assinaturas (APRS/RII)", "status": "CF", "info_checklist": "Datas de realização e dados das assinaturas identificadas", "justificativa": "Análise técnica fundamentada"}},
+                "item_3": {{"item": "Rastreabilidade de Componentes Classe I e II (Form 1 / FAA 8130-3)", "status": "CF", "info_checklist": "Part Numbers e Serial Numbers verificados nos documentos", "justificativa": "Análise técnica fundamentada"}},
+                "item_4": {{"item": "Certificado de Verificação de Aeronavegabilidade (CVA) e Validade do CA", "status": "CF", "info_checklist": "Datas de vigência e conformidade regulamentar", "justificativa": "Análise técnica fundamentada"}},
+                "item_5": {{"item": "Análise de Histórico de Panes Repetitivas (ATA) - Janela de 60 Dias", "status": "CF", "info_checklist": "Recorrências encontradas ou declaração de conformidade", "justificativa": "Análise técnica fundamentada"}},
                 "gatilhos_vermelhos": 0,
                 "gatilhos_amarelos": 0
             }}
@@ -114,11 +113,11 @@ with aba_auditoria:
             lista_midia.append(prompt_auditoria_final)
             
             try:
-                # 🔄 ATIVAÇÃO DO MOTOR DE ALTA PRECISÃO GEMINI PRO
-                model_gemini = genai.GenerativeModel('gemini-2.5-pro')
-                response_pro = model_gemini.generate_content(lista_midia)
+                # Mudança estratégica para o 1.5-flash para contornar o erro de cota
+                model_gemini = genai.GenerativeModel('gemini-1.5-flash')
+                response_flash = model_gemini.generate_content(lista_midia)
                 
-                res_clean = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", response_pro.text.strip()).strip()
+                res_clean = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", response_flash.text.strip()).strip()
                 res_json = json.loads(res_clean)
                 
                 st.success("📋 Relatório de Checklist Técnico RINA Concluído!")
@@ -149,17 +148,17 @@ with aba_auditoria:
                         simb = "🟢" if obj["status"] == "CF" else "🔴"
                         with st.expander(f"{simb} {obj['item']} — [{obj['status']}]", expanded=True):
                             st.markdown(f"**ℹ️ Dados do Checklist:** *{obj['info_checklist']}*")
-                            st.markdown(f"**💬 Parecer Técnico Pro:** {obj['justificativa']}")
+                            st.markdown(f"**💬 Parecer Técnico IA:** {obj['justificativa']}")
                 with col_res2:
                     fig = go.Figure(data=[go.Bar(x=["Não Conformidades (NC)", "Alertas"], y=[int(res_json["gatilhos_vermelhos"]), int(res_json["gatilhos_amarelos"])], marker_color=['#EF553B', '#FF9900'])])
                     fig.update_layout(template="plotly_white", height=350)
                     st.plotly_chart(fig, use_container_width=True)
                     
             except Exception as e:
-                st.error(f"Erro no processamento do motor Gemini Pro. Detalhes: {e}")
+                st.error(f"Erro no processamento do motor Gemini. Detalhes: {e}")
 
 # ==========================================
-# OUTRAS ABAS ADAPTADAS PARA O GEMINI PRO
+# ABA: DASHBOARD DE PERFORMANCE (60 DIAS)
 # ==========================================
 with aba_dashboard:
     st.header("📊 Análise de Tendências e Janela de 60 Dias")
@@ -171,7 +170,7 @@ with aba_dashboard:
             prompt_dash = f"Analise a evidência buscando eventos críticos operacionais em 60 dias (TOP 10, TOP 3, prazos). Retorne JSON puro:\n{{\"panes_repetitivas\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"ranking_indisponibilidade\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"prazo_abertura\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"critico\": 0}}\nTexto: {texto_dash[:10000]}"
             midias.append(prompt_dash)
             try:
-                model = genai.GenerativeModel('gemini-2.5-pro')
+                model = genai.GenerativeModel('gemini-1.5-flash')
                 res_dash = model.generate_content(midias)
                 clean_dash = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", res_dash.text.strip()).strip()
                 json_dash = json.loads(clean_dash)
