@@ -2,21 +2,17 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from pypdf import PdfReader
-import google.generativeai as genai
 import json
 import re
 from PIL import Image
 import io
+import requests
+import base64
 
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Plataforma de Auditoria Avançada RINA", page_icon="✈️", layout="wide")
 
-# 2. CONFIGURAÇÃO DO MOTOR GEMINI
-try:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-except:
-    pass
-
+# 2. CONFIGURAÇÃO DA BASE DE CONHECIMENTO INICIAL
 if "banco_conhecimento" not in st.session_state:
     st.session_state.banco_conhecimento = "Diretrizes padrão Petrobras/RINA aplicadas para auditorias de aeronavegabilidade."
 
@@ -53,20 +49,72 @@ aba_auditoria, aba_dashboard, aba_conhecimento, aba_admin = st.tabs([
     "🛠️ Painel Admin"
 ])
 
+# Função para converter imagem PIL para base64 para envio via API nativa
 def extrair_dados_multiplos_arquivos(arquivos):
-    conteudo_gemini = []
+    conteudo_imagens_api = []
     texto_acumulado = ""
-    for i, arquivo in enumerate(arquivos):
+    for arquivo in arquivos:
         nome = arquivo.name.lower()
-        if nome.endswith(('.png', '.jpg', '.jpeg')) and i < 10:
-            conteudo_gemini.append(Image.open(arquivo))
+        if nome.endswith(('.png', '.jpg', '.jpeg')):
+            try:
+                img = Image.open(arquivo)
+                buffered = io.BytesIO()
+                img.save(buffered, format="JPEG")
+                img_str = base64.b64encode(buffered.getvalue()).decode()
+                conteudo_imagens_api.append({
+                    "inline_data": {
+                        "mime_type": "image/jpeg",
+                        "data": img_str
+                    }
+                })
+            except:
+                pass
         elif nome.endswith('.pdf'):
-            reader = PdfReader(arquivo)
-            for page in reader.pages: texto_acumulado += page.extract_text() + "\n"
+            try:
+                reader = PdfReader(arquivo)
+                for page in reader.pages: 
+                    texto_acumulado += page.extract_text() + "\n"
+            except:
+                pass
         elif nome.endswith('.xlsx'):
-            df = pd.read_excel(arquivo).dropna(how='all')
-            texto_acumulado += f"\n[Planilha {arquivo.name}]:\n{df.to_string()}\n"
-    return conteudo_gemini, texto_acumulado
+            try:
+                df = pd.read_excel(arquivo).dropna(how='all')
+                texto_acumulado += f"\n[Planilha {arquivo.name}]:\n{df.to_string()}\n"
+            except:
+                pass
+    return conteudo_imagens_api, texto_acumulado
+
+# Função de Conexão Direta HTTP com a API estável v1 do Gemini
+def chamar_gemini_via_http(prompt, imagens_api):
+    try:
+        api_key = st.secrets["GEMINI_API_KEY"]
+    except:
+        return "Erro: Chave secreta GEMINI_API_KEY não encontrada no Streamlit."
+        
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
+    headers = {"Content-Type": "application/json"}
+    
+    # Monta as partes da requisição (Imagens + Texto do Prompt)
+    parts = []
+    for img_part in imagens_api:
+        parts.append(img_part)
+    parts.append({"text": prompt})
+    
+    payload = {
+        "contents": [{
+            "parts": parts
+        }]
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=90)
+        if response.status_code == 200:
+            res_json = response.json()
+            return res_json['candidates'][0]['content']['parts'][0]['text']
+        else:
+            return f"Erro HTTP {response.status_code}: {response.text}"
+    except Exception as e:
+        return f"Falha na conexão com o servidor do Google: {e}"
 
 # ==========================================
 # ABA: EXECUÇÃO DO CHECKLIST
@@ -82,7 +130,7 @@ with aba_auditoria:
 
     if arquivos_auditoria:
         if st.button(f"🔍 Rodar Auditoria Otimizada ({len(arquivos_auditoria)} arquivos)"):
-            st.info("⚙️ Processando evidências através do motor Gemini... Cruzando dados...")
+            st.info("⚙️ Processando evidências através de conexão direta na nuvem Google... Cruzando dados...")
             
             lista_midia, texto_total = extrair_dados_multiplos_arquivos(arquivos_auditoria)
             
@@ -96,7 +144,7 @@ with aba_auditoria:
             No campo 'info_checklist', coloque de forma exata e literal as datas, validades e números de série que encontrar. 
             No campo 'justificativa', apresente o parecer técnico fundamentado com rigor de auditoria.
 
-            Retorne estritamente un objeto JSON puro (sem tags markdown ou caracteres extras):
+            Retorne estritamente um objeto JSON puro (sem tags markdown, blocos de código ```json ou caracteres extras):
             {{
                 "item_1": {{"item": "Seguro RETA e Validades de Portarias", "status": "CF", "info_checklist": "Validades exatas e número de adendos encontrados", "justificativa": "Análise técnica fundamentada"}},
                 "item_2": {{"item": "Liberações Técnicas, Ordens de Serviço e Assinaturas (APRS/RII)", "status": "CF", "info_checklist": "Datas de realização e dados das assinaturas identificadas", "justificativa": "Análise técnica fundamentada"}},
@@ -110,51 +158,53 @@ with aba_auditoria:
             Textos e Planilhas Extraídos:
             {texto_total[:15000]}
             """
-            lista_midia.append(prompt_auditoria_final)
             
-            try:
-                # Com a biblioteca atualizada no requirements.txt, esta chamada limpa passa a ser aceita de forma nativa
-                model_gemini = genai.GenerativeModel('gemini-1.5-flash')
-                response_flash = model_gemini.generate_content(lista_midia)
-                
-                res_clean = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", response_flash.text.strip()).strip()
-                res_json = json.loads(res_clean)
-                
-                st.success("📋 Relatório de Checklist Técnico RINA Concluído!")
-                
-                # --- MONTAGEM DA TABELA FIEL PARA DOWNLOAD ---
-                lista_itens = [res_json[f"item_{i}"] for i in range(1, 6)]
-                df_checklist_respondido = pd.DataFrame(lista_itens)
-                df_checklist_respondido.columns = ["Item de Inspeção", "Status (CF/NC)", "Dados Coletados (Validades/Datas/Séries)", "Parecer Técnico Fundamentado"]
-                
-                output_excel = io.BytesIO()
-                with pd.ExcelWriter(output_excel, engine='openpyxl') as writer:
-                    df_checklist_respondido.to_excel(writer, index=False, sheet_name="Checklist RINA")
-                dados_excel_bytes = output_excel.getvalue()
-
-                st.download_button(
-                    label="📥 Baixar Checklist Oficial Respondido em Excel (.xlsx)",
-                    data=dados_excel_bytes,
-                    file_name=f"Checklist_Oficial_RINA_{prefixo}_{escopo}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-                
-                st.write("---")
-                col_res1, col_res2 = st.columns(2)
-                with col_res1:
-                    for i in range(1, 6):
-                        obj = res_json[f"item_{i}"]
-                        simb = "🟢" if obj["status"] == "CF" else "🔴"
-                        with st.expander(f"{simb} {obj['item']} — [{obj['status']}]", expanded=True):
-                            st.markdown(f"**ℹ️ Dados do Checklist:** *{obj['info_checklist']}*")
-                            st.markdown(f"**💬 Parecer Técnico IA:** {obj['justificativa']}")
-                with col_res2:
-                    fig = go.Figure(data=[go.Bar(x=["Não Conformidades (NC)", "Alertas"], y=[int(res_json["gatilhos_vermelhos"]), int(res_json["gatilhos_amarelos"])], marker_color=['#EF553B', '#FF9900'])])
-                    fig.update_layout(template="plotly_white", height=350)
-                    st.plotly_chart(fig, use_container_width=True)
+            resposta_texto = chamar_gemini_via_http(prompt_auditoria_final, lista_midia)
+            
+            if "Erro" in resposta_texto or "Falha" in resposta_texto:
+                st.error(resposta_texto)
+            else:
+                try:
+                    res_clean = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", resposta_texto.strip()).strip()
+                    res_json = json.loads(res_clean)
                     
-            except Exception as e:
-                st.error(f"Erro no processamento do motor Gemini. Detalhes: {e}")
+                    st.success("📋 Relatório de Checklist Técnico RINA Concluído!")
+                    
+                    # --- MONTAGEM DA TABELA FIEL PARA DOWNLOAD ---
+                    lista_itens = [res_json[f"item_{i}"] for i in range(1, 6)]
+                    df_checklist_respondido = pd.DataFrame(lista_itens)
+                    df_checklist_respondido.columns = ["Item de Inspeção", "Status (CF/NC)", "Dados Coletados (Validades/Datas/Séries)", "Parecer Técnico Fundamentado"]
+                    
+                    output_excel = io.BytesIO()
+                    with pd.ExcelWriter(output_excel, engine='openpyxl') as writer:
+                        df_checklist_respondido.to_excel(writer, index=False, sheet_name="Checklist RINA")
+                    dados_excel_bytes = output_excel.getvalue()
+
+                    st.download_button(
+                        label="📥 Baixar Checklist Oficial Respondido em Excel (.xlsx)",
+                        data=dados_excel_bytes,
+                        file_name=f"Checklist_Oficial_RINA_{prefixo}_{escopo}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                    
+                    st.write("---")
+                    col_res1, col_res2 = st.columns(2)
+                    with col_res1:
+                        for i in range(1, 6):
+                            obj = res_json[f"item_{i}"]
+                            simb = "🟢" if obj["status"] == "CF" else "🔴"
+                            with st.expander(f"{simb} {obj['item']} — [{obj['status']}]", expanded=True):
+                                st.markdown(f"**ℹ️ Dados do Checklist:** *{obj['info_checklist']}*")
+                                st.markdown(f"**💬 Parecer Técnico IA:** {obj['justificativa']}")
+                    with col_res2:
+                        fig = go.Figure(data=[go.Bar(x=["Não Conformidades (NC)", "Alertas"], y=[int(res_json["gatilhos_vermelhos"]), int(res_json["gatilhos_amarelos"])], marker_color=['#EF553B', '#FF9900'])])
+                        fig.update_layout(template="plotly_white", height=350)
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                except Exception as e:
+                    st.error(f"Erro ao processar o formato do relatório. Detalhes: {e}")
+                    st.text("Resposta bruta recebida:")
+                    st.code(resposta_texto)
 
 # ==========================================
 # ABA: DASHBOARD DE PERFORMANCE (60 DIAS)
@@ -166,20 +216,25 @@ with aba_dashboard:
         if st.button("⚡ Analisar Apenas Gatilhos de Performance"):
             st.info("Buscando picos de indisponibilidade operacional...")
             midias, texto_dash = extrair_dados_multiplos_arquivos([arquivo_dash])
-            prompt_dash = f"Analise a evidência buscando eventos críticos operacionais em 60 dias (TOP 10, TOP 3, prazos). Retorne JSON puro:\n{{\"panes_repetitivas\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"ranking_indisponibilidade\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"prazo_abertura\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"critico\": 0}}\nTexto: {texto_dash[:10000]}"
-            midias.append(prompt_dash)
-            try:
-                model = genai.GenerativeModel('gemini-1.5-flash')
-                res_dash = model.generate_content(midias)
-                clean_dash = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", res_dash.text.strip()).strip()
-                json_dash = json.loads(clean_dash)
-                st.subheader("🚨 Diagnóstico de Alertas Operacionais")
-                if json_dash["critico"] == 1: st.error("⚠️ ALERTA: Esta aeronave atingiu gatilhos críticos!")
-                else: st.success("🟢 Performance operacional em conformidade.")
-                st.write(f"**🔧 Panes Repetitivas (ATA):** {json_dash['panes_repetitivas']['dados']}")
-                st.write(f"**📈 Posição em Rankings:** {json_dash['ranking_indisponibilidade']['dados']}")
-                st.write(f"**📅 Antecedência de Paradas:** {json_dash['prazo_abertura']['dados']}")
-            except Exception as e: st.error(f"Erro: {e}")
+            prompt_dash = f"Analise a evidência buscando eventos críticos operacionais em 60 dias (TOP 10, TOP 3, prazos). Retorne JSON puro sem formatação markdown:\n{{\"panes_repetitivas\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"ranking_indisponibilidade\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"prazo_abertura\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"critico\": 0}}\nTexto: {texto_dash[:10000]}"
+            
+            resposta_dash = chamar_gemini_via_http(prompt_dash, midias)
+            
+            if "Erro" in resposta_dash or "Falha" in resposta_dash:
+                st.error(resposta_dash)
+            else:
+                try:
+                    clean_dash = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", resposta_dash.text.strip()).strip() if hasattr(resposta_dash, 'text') else re.sub(r"^```[a-zA-Z]*\n|\n```$", "", resposta_dash.strip()).strip()
+                    json_dash = json.loads(clean_dash)
+                    st.subheader("🚨 Diagnóstico de Alertas Operacionais")
+                    if json_dash["critico"] == 1: st.error("⚠️ ALERTA: Esta aeronave atingiu gatilhos críticos!")
+                    else: st.success("🟢 Performance operacional em conformidade.")
+                    st.write(f"**🔧 Panes Repetitivas (ATA):** {json_dash['panes_repetitivas']['dados']}")
+                    st.write(f"**📈 Posição em Rankings:** {json_dash['ranking_indisponibilidade']['dados']}")
+                    st.write(f"**📅 Antecedência de Paradas:** {json_dash['prazo_abertura']['dados']}")
+                except Exception as e: 
+                    st.error(f"Erro: {e}")
+                    st.code(resposta_dash)
 
 with aba_conhecimento:
     st.header("📝 Treinar e Alimentar o Cérebro da IA")
