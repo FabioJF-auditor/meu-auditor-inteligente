@@ -185,7 +185,7 @@ def extrair_dados_multiplos_arquivos(arquivos):
                 pass
     return conteudo_partes, texto_acumulado
 
-def ejecutar_chamada_gemini(prompt, imagens):
+def executar_chamada_gemini(prompt, imagens):
     """Executa a chamada usando a nomenclatura direta para compatibilidade universal"""
     try:
         model = genai.GenerativeModel('gemini-1.5-flash')
@@ -256,7 +256,7 @@ Dados textuais extraídos:
 {texto_arquivos[:14000]}
 """
             
-            resposta_agente = ejecutar_chamada_gemini(prompt_auditoria, imagens)
+            resposta_agente = executar_chamada_gemini(prompt_auditoria, imagens)
             
             try:
                 res_clean = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", resposta_agente.strip()).strip()
@@ -306,7 +306,7 @@ with tab_documentos:
         st.subheader("Gerar Novo RAA Corporativo")
         c_pref = st.text_input("Prefixo Regulamentar:", value="PR-", key="raa_pref")
         c_op = st.text_input("Operadora de Logística Offshore:", value="Ex: Omni, Líder, CHC")
-        c_text = st.text_area("Conclusão Técnico e Parecer Final:")
+        c_text = st.text_area("Conclusão Técnica e Parecer Final:")
         
         if st.button("💾 Chancelar e Assinar RAA"):
             novo_raa = {"Aeronave": c_pref, "Operadora": c_op, "Parecer Técnico": c_text, "Auditor Líder": st.session_state.usuario_logado}
@@ -357,7 +357,8 @@ Retorne obrigatoriamente um JSON puro, sem markdown:
 }}
 Texto extraído: {texto_dash[:8000]}
 """
-            resposta_dash = ejecutar_chamada_gemini(prompt_dash, midias)
+            # CORREÇÃO CRUCIAL AQUI: Função unificada correta com 'x'
+            resposta_dash = executar_chamada_gemini(prompt_dash, midias)
             try:
                 clean_dash = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", resposta_dash.strip()).strip()
                 json_dash = json.loads(clean_dash)
@@ -390,7 +391,7 @@ with tab_conhecimento:
     regras_texto = st.text_area("Regras e Diretrizes Ativas no Cérebro do Aplicativo:", value=st.session_state.banco_conhecimento, height=200)
     if st.button("Salvar Modificações de Diretrizes"):
         st.session_state.banco_conhecimento = regras_texto
-        st.success("🧠 Diretrizes operacionais atualizadas!")
+        st.success("🧠 Diretrizes operacionais updated!")
 
 # ------------------------------------------
 # ABA 5: GESTÃO DE ACESSOS (PAINEL DO SUPERVISOR)
