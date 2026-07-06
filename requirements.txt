@@ -4,5 +4,4 @@ plotly
 pypdf
 openpyxl
 pillow
-google-genai
-requests
+google-generativeai
