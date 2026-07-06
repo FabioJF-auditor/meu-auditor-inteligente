@@ -84,15 +84,15 @@ def extrair_dados_multiplos_arquivos(arquivos):
                 pass
     return conteudo_imagens_api, texto_acumulado
 
-# Função de Conexão Direta HTTP com o modelo estável corrigido do Gemini
+# Função de Conexão Direta HTTP com o modelo gemini-1.5-flash estável universal
 def chamar_gemini_via_http(prompt, imagens_api):
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
     except:
         return "Erro: Chave secreta GEMINI_API_KEY não encontrada no Streamlit."
         
-    # Ajustado para a rota oficial estável de produção global do Gemini 1.5 Pro
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro-latest:generateContent?key={api_key}"
+    # Nomenclatura oficial aceita em todas as chaves v1 padrão do Google
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     
     parts = []
