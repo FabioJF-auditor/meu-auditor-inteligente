@@ -84,15 +84,15 @@ def extrair_dados_multiplos_arquivos(arquivos):
                 pass
     return conteudo_imagens_api, texto_acumulado
 
-# Função de Conexão Direta HTTP com o modelo gemini-pro (v1 estável)
+# Função de Conexão Direta HTTP com o modelo estável corrigido do Gemini
 def chamar_gemini_via_http(prompt, imagens_api):
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
     except:
         return "Erro: Chave secreta GEMINI_API_KEY não encontrada no Streamlit."
         
-    # Alterado para a rota oficial e estável do modelo gemini-pro
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={api_key}"
+    # Ajustado para a rota oficial estável de produção global do Gemini 1.5 Pro
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro-latest:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     
     parts = []
@@ -148,7 +148,7 @@ with aba_auditoria:
             {{
                 "item_1": {{"item": "Seguro RETA e Validades de Portarias", "status": "CF", "info_checklist": "Validades exatas e número de adendos encontrados", "justificativa": "Análise técnica fundamentada"}},
                 "item_2": {{"item": "Liberações Técnicas, Ordens de Serviço e Assinaturas (APRS/RII)", "status": "CF", "info_checklist": "Datas de realização e dados das assinaturas identificadas", "justificativa": "Análise técnica fundamentada"}},
-                "item_3": {{"item": "Rastreabilidade de Componentes Classe I e II (Form 1 / FAA 8130-3)", "status": "CF", "info_checklist": "Part Numbers e Serial Numbers verificados nos documents", "justificativa": "Análise técnica fundamentada"}},
+                "item_3": {{"item": "Rastreabilidade de Componentes Classe I e II (Form 1 / FAA 8130-3)", "status": "CF", "info_checklist": "Part Numbers e Serial Numbers verificados nos documentos", "justificativa": "Análise técnica fundamentada"}},
                 "item_4": {{"item": "Certificado de Verificação de Aeronavegabilidade (CVA) e Validade do CA", "status": "CF", "info_checklist": "Datas de vigência e conformidade regulamentar", "justificativa": "Análise técnica fundamentada"}},
                 "item_5": {{"item": "Análise de Histórico de Panes Repetitivas (ATA) - Janela de 60 Dias", "status": "CF", "info_checklist": "Recorrências encontradas ou declaração de conformidade", "justificativa": "Análise técnica fundamentada"}},
                 "gatilhos_vermelhos": 0,
