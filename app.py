@@ -11,7 +11,7 @@ import io
 # 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Plataforma de Auditoria Avançada RINA", page_icon="✈️", layout="wide")
 
-# 2. CONFIGURAÇÃO DO MOTOR GEMINI (Utilizando o estável 1.5-flash para evitar erros de cota)
+# 2. CONFIGURAÇÃO DO MOTOR GEMINI
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 except:
@@ -69,7 +69,7 @@ def extrair_dados_multiplos_arquivos(arquivos):
     return conteudo_gemini, texto_acumulado
 
 # ==========================================
-# ABA: EXECUÇÃO DO CHECKLIST (MOTOR FLASH SEM TRAVAMENTOS)
+# ABA: EXECUÇÃO DO CHECKLIST
 # ==========================================
 with aba_auditoria:
     c1, c2, c3 = st.columns(3)
@@ -82,7 +82,7 @@ with aba_auditoria:
 
     if arquivos_auditoria:
         if st.button(f"🔍 Rodar Auditoria Otimizada ({len(arquivos_auditoria)} arquivos)"):
-            st.info("⚙️ Processando evidências através do motor Gemini Flash... Cruzando dados...")
+            st.info("⚙️ Processando evidências através do motor Gemini... Cruzando dados...")
             
             lista_midia, texto_total = extrair_dados_multiplos_arquivos(arquivos_auditoria)
             
@@ -96,7 +96,7 @@ with aba_auditoria:
             No campo 'info_checklist', coloque de forma exata e literal as datas, validades e números de série que encontrar. 
             No campo 'justificativa', apresente o parecer técnico fundamentado com rigor de auditoria.
 
-            Retorne estritamente um objeto JSON puro (sem tags markdown ou caracteres extras):
+            Retorne estritamente un objeto JSON puro (sem tags markdown ou caracteres extras):
             {{
                 "item_1": {{"item": "Seguro RETA e Validades de Portarias", "status": "CF", "info_checklist": "Validades exatas e número de adendos encontrados", "justificativa": "Análise técnica fundamentada"}},
                 "item_2": {{"item": "Liberações Técnicas, Ordens de Serviço e Assinaturas (APRS/RII)", "status": "CF", "info_checklist": "Datas de realização e dados das assinaturas identificadas", "justificativa": "Análise técnica fundamentada"}},
@@ -113,8 +113,8 @@ with aba_auditoria:
             lista_midia.append(prompt_auditoria_final)
             
             try:
-                # Mudança estratégica para o 1.5-flash para contornar o erro de cota
-                model_gemini = genai.GenerativeModel('gemini-1.5-flash')
+                # CORREÇÃO DEFINITIVA DO NOME DO MODELO
+                model_gemini = genai.GenerativeModel('gemini-1.5-flash-latest')
                 response_flash = model_gemini.generate_content(lista_midia)
                 
                 res_clean = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", response_flash.text.strip()).strip()
@@ -132,7 +132,6 @@ with aba_auditoria:
                     df_checklist_respondido.to_excel(writer, index=False, sheet_name="Checklist RINA")
                 dados_excel_bytes = output_excel.getvalue()
 
-                # Botão Oficial de Download em Excel
                 st.download_button(
                     label="📥 Baixar Checklist Oficial Respondido em Excel (.xlsx)",
                     data=dados_excel_bytes,
@@ -170,7 +169,8 @@ with aba_dashboard:
             prompt_dash = f"Analise a evidência buscando eventos críticos operacionais em 60 dias (TOP 10, TOP 3, prazos). Retorne JSON puro:\n{{\"panes_repetitivas\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"ranking_indisponibilidade\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"prazo_abertura\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"critico\": 0}}\nTexto: {texto_dash[:10000]}"
             midias.append(prompt_dash)
             try:
-                model = genai.GenerativeModel('gemini-1.5-flash')
+                # CORREÇÃO DEFINITIVA DO NOME DO MODELO
+                model = genai.GenerativeModel('gemini-1.5-flash-latest')
                 res_dash = model.generate_content(midias)
                 clean_dash = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", res_dash.text.strip()).strip()
                 json_dash = json.loads(clean_dash)
