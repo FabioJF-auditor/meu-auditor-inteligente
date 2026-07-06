@@ -6,67 +6,170 @@ import json
 import re
 from PIL import Image
 import io
-import requests
-import base64
+import time
+from google import genai
+from google.genai import types
 
-# 1. CONFIGURAÇÃO DA PÁGINA
-st.set_page_config(page_title="Plataforma de Auditoria Avançada RINA", page_icon="✈️", layout="wide")
+# ==========================================
+# 1. IDENTIDADE VISUAL RINA BRASIL (CSS CUSTOM)
+# ==========================================
+st.set_page_config(
+    page_title="RINA & Petrobras - Plataforma de Auditoria Avançada", 
+    page_icon="✈️", 
+    layout="wide"
+)
 
-# 2. CONFIGURAÇÃO DA BASE DE CONHECIMENTO INICIAL
+# Injeção de CSS para customizar as cores institucionais e o ambiente de aviação
+st.markdown("""
+    <style>
+        /* Cores Principais do App */
+        :root {
+            --primary-color: #002060; /* Azul Escuro RINA */
+            --secondary-color: #FFC000; /* Dourado Aeronáutico */
+        }
+        
+        /* Customização de Botões */
+        .stButton>button {
+            background-color: #002060 !important;
+            color: white !important;
+            border-radius: 6px !important;
+            border: 1px solid #FFC000 !important;
+            font-weight: bold !important;
+            transition: all 0.3s ease;
+        }
+        .stButton>button:hover {
+            background-color: #FFC000 !important;
+            color: #002060 !important;
+            box-shadow: 0px 4px 10px rgba(255, 192, 0, 0.4);
+        }
+        
+        /* Customização dos Títulos e Headers */
+        h1, h2, h3 {
+            color: #002060 !important;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        /* Estilização dos Boxes de Alerta */
+        .stAlert {
+            border-left: 5px solid #FFC000 !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# Inicialização segura das variáveis de estado (Memória do App)
 if "banco_conhecimento" not in st.session_state:
-    st.session_state.banco_conhecimento = "Diretrizes padrão Petrobras/RINA aplicadas para auditorias de aeronavegabilidade."
+    st.session_state.banco_conhecimento = "Diretrizes padrão RINA Brasil e Petrobras para auditorias de conformidade de helicópteros offshore (ACCI, ACC, ACCD)."
+if "historico_raa" not in st.session_state:
+    st.session_state.historico_raa = []
+if "historico_rnc" not in st.session_state:
+    st.session_state.historico_rnc = []
 
-# 3. CONTROLE DE ACESSO
+# ==========================================
+# 2. CONTROLE DE ACESSO EXCLUSIVO
+# ==========================================
 if "usuarios_db" not in st.session_state:
     st.session_state.usuarios_db = {"fabio.ferreira@rina.org": "administrador"}
 if "usuario_logado" not in st.session_state:
     st.session_state.usuario_logado = None
 
 if st.session_state.usuario_logado is None:
-    st.title("🔐 Controle de Acesso - Auditoria RINA/Petrobras")
-    email_input = st.text_input("Insira seu e-mail institucional:").strip().lower()
-    if st.button("Solicitar Acesso / Entrar"):
+    st.title("🔐 RINA Brasil & Petrobras — Portal Aeromédico/Offshore")
+    email_input = st.text_input("Insira seu e-mail institucional para acessar a cabine:").strip().lower()
+    if st.button("Autenticar e Iniciar Sistemas"):
         if not (email_input.endswith("@petrobras.com.br") or email_input.endswith("@rina.org") or email_input.endswith(".prestserv@petrobras.com.br")):
-            st.error("❌ Domínio não autorizado.")
+            st.error("❌ Domínio de e-mail não autorizado para auditoria aeronáutica.")
         else:
             if email_input not in st.session_state.usuarios_db:
                 st.session_state.usuarios_db[email_input] = "pendente"
-                st.warning("⚠️ Aguarde a liberação do Supervisor Fabio Ferreira.")
+                st.warning("⚠️ Usuário novo registrado. Aguarde a liberação do Supervisor Fabio Ferreira.")
             elif st.session_state.usuarios_db[email_input] in ["aprovado", "administrador"]:
                 st.session_state.usuario_logado = email_input
-                st.success("🔓 Acesso liberado!")
+                st.success("🔓 Painel liberado. Tripulação pronta para o voo!")
                 st.rerun()
     st.stop()
 
-# --- INTERFACE PRINCIPAL ---
-st.title("🚀 Hub de Inteligência Artificial RINA — Auditoria Automatizada")
-st.write(f"**Auditor Responsável:** {st.session_state.usuario_logado}")
+# ==========================================
+# 3. HUB DE LINKS REGULATÓRIOS (BARRA LATERAL)
+# ==========================================
+with st.sidebar:
+    st.markdown("<h2 style='text-align: center; color: #002060;'>✈️ Cockpit do Auditor</h2>", unsafe_allow_html=True)
+    st.markdown(f"**Operador Logístico Ativo:** \n`{st.session_state.usuario_logado}`")
+    st.write("---")
+    
+    st.subheader("🌐 Links de Pesquisa e Legislação")
+    
+    with st.expander("🦅 Autoridade Aeronáutica (ANAC)", expanded=True):
+        st.link_button("🔎 Consulta RAB (Aeronaves)", "https://sistemas.anac.gov.br/aeronaves/cons_rab.asp", use_container_width=True)
+        st.link_button("📚 Coleção de RBAC / RBHA", "https://www.anac.gov.br/assuntos/legislacao/legislacao-1/rbha-e-rbac/rbac", use_container_width=True)
+        st.link_button("🔍 Pesquisa de Legislação ANAC", "https://www.anac.gov.br/assuntos/legislacao/busca-legislacao", use_container_width=True)
+        st.link_button("📋 Instruções Suplementares (IS)", "https://www.anac.gov.br/assuntos/legislacao/instrucoes-suplementares", use_container_width=True)
+        st.link_button("📄 Especificações Operativas (EO)", "https://www.gov.br/anac/pt-br/assuntos/regulados/empresas-aereas/especificacoes-operativas", use_container_width=True)
+        st.link_button("🖥️ Portal SIAC", "https://sistemas.anac.gov.br/siac", use_container_width=True)
+        st.link_button("🏛️ Gov.br ANAC", "https://www.gov.br/anac", use_container_width=True)
 
-aba_auditoria, aba_dashboard, aba_conhecimento, aba_admin = st.tabs([
-    "📋 Executar Checklist Padrão RINA", 
-    "📊 Analisar Apenas Dashboard (60 Dias)", 
-    "📚 Enriquecer Base de IA", 
-    "🛠️ Painel Admin"
-])
+    with st.expander("⛈️ Planejamento de Voo & Clima (DECEA)", expanded=False):
+        st.link_button("🗺️ AISWEB (Cartas Aeródromo)", "https://aisweb.decea.mil.br", use_container_width=True)
+        st.link_button("📡 REDEMET (METAR/TAF)", "https://redemet.decea.mil.br", use_container_width=True)
+        st.link_button("🚀 CENIPA (Investigação e Prevenção)", "https://www.gov.br/cenipa", use_container_width=True)
 
-# Função para extrair textos e preparar imagens para envio via API nativa
+    with st.expander("⚓ Autoridade Marítima (DPC)", expanded=False):
+        st.link_button("🏛️ Diretoria de Portos e Costas", "https://www.marinha.mil.br/dpc", use_container_width=True)
+        st.link_button("📜 Normas NORMAM", "https://www.marinha.mil.br/dpc/normas-e-publicacoes", use_container_width=True)
+
+    with st.expander("⛽ Contratos e Suprimentos Petrobras", expanded=False):
+        st.link_button("🏢 Portal Petrobras", "https://petrobras.com.br", use_container_width=True)
+        st.link_button("🤝 Portal do Fornecedor", "https://fornecedores.petrobras.com.br", use_container_width=True)
+        st.link_button("💻 Petronect (Licitações)", "https://www.petronect.com.br", use_container_width=True)
+
+    with st.expander("🌍 Órgãos e Padrões Globais", expanded=False):
+        st.link_button("🇺🇳 ICAO", "https://www.icao.int", use_container_width=True)
+        st.link_button("🛢️ IOGP", "https://www.iogp.org", use_container_width=True)
+        st.link_button("🚁 HeliOffshore", "https://www.helioffshore.org", use_container_width=True)
+        st.link_button("🇺🇸 FAA", "https://www.faa.gov", use_container_width=True)
+        st.link_button("🇪🇺 EASA", "https://www.easa.europa.eu", use_container_width=True)
+
+    st.write("---")
+    if st.button("🚪 Sair do Sistema", use_container_width=True):
+        st.session_state.usuario_logado = None
+        st.rerun()
+
+# ==========================================
+# 4. ENGENHARIA DE SIMULAÇÃO DE VOO (ANIMATION SPINNER)
+# ==========================================
+def simular_voo_pairado(modelo_aeronave):
+    """Gera uma janela de simulação visual de parâmetros técnicos dependendo do helicóptero selecionado"""
+    placeholder = st.empty()
+    passos = [
+        "Pre-flight Check & Inicialização de Sistemas de Bordo...",
+        "Acionamento dos Motores Safran/Pratt & Whitney...",
+        f"Giro de Rotor Principal — Aeronave {modelo_aeronave} em sustentação...",
+        f"Voo Pairado Estabilizado (Hovering Mode). Executando varredura eletrônica..."
+    ]
+    for passo in passos:
+        placeholder.markdown(f"""
+        <div style='background-color: #002060; padding: 20px; border-radius: 8px; border: 2px solid #FFC000; text-align: center;'>
+            <p style='color: #FFC000; font-size: 20px; margin: 0; font-weight: bold;'>🚁 [SIMULADOR DE VOO PAIRADO ATIVO - {modelo_aeronave}]</p>
+            <p style='color: white; font-size: 16px; margin-top: 10px;'>Status da Telemetria: <b>{passo}</b></p>
+            <div style='width: 100%; background-color: #ddd; height: 10px; border-radius: 5px; margin-top: 15px; overflow: hidden;'>
+                <div style='width: 75%; background-color: #FFC000; height: 100%; animation: progress 2s ease-in-out infinite;'></div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        time.sleep(0.8)
+    placeholder.empty()
+
+# ==========================================
+# 5. PROCESSAMENTO DE ARQUIVOS E CORREÇÃO SDK
+# ==========================================
 def extrair_dados_multiplos_arquivos(arquivos):
-    conteudo_imagens_api = []
+    conteudo_partes = []
     texto_acumulado = ""
     for arquivo in arquivos:
         nome = arquivo.name.lower()
         if nome.endswith(('.png', '.jpg', '.jpeg')):
             try:
                 img = Image.open(arquivo)
-                buffered = io.BytesIO()
-                img.save(buffered, format="JPEG")
-                img_str = base64.b64encode(buffered.getvalue()).decode()
-                conteudo_imagens_api.append({
-                    "inline_data": {
-                        "mime_type": "image/jpeg",
-                        "data": img_str
-                    }
-                })
+                conteudo_partes.append(img)
             except:
                 pass
         elif nome.endswith('.pdf'):
@@ -82,187 +185,247 @@ def extrair_dados_multiplos_arquivos(arquivos):
                 texto_acumulado += f"\n[Planilha {arquivo.name}]:\n{df.to_string()}\n"
             except:
                 pass
-    return conteudo_imagens_api, texto_acumulado
+    return conteudo_partes, texto_acumulado
 
-# Função de Conexão Direta HTTP usando a rota v1beta com o nome corrigido do modelo
-def chamar_gemini_via_http(prompt, imagens_api):
+def executar_chamada_agente_total(prompt, imagens):
+    """Executa a chamada usando o SDK oficial do Google ativando o RAG e a Pesquisa no Google ao mesmo tempo"""
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
+        client = genai.Client(api_key=api_key)
     except:
-        return "Erro: Chave secreta GEMINI_API_KEY não encontrada no Streamlit."
-        
-    # Corrigido para gemini-1.5-flash-latest exigido pela versão v1beta da sua conta
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={api_key}"
-    headers = {"Content-Type": "application/json"}
+        return "Erro: Chave secreta GEMINI_API_KEY não configurada nos Secrets do Streamlit."
     
-    parts = []
-    for img_part in imagens_api:
-        parts.append(img_part)
-    parts.append({"text": prompt})
-    
-    payload = {
-        "contents": [{
-            "parts": parts
-        }]
-    }
+    conteudo_final = []
+    conteudo_final.extend(imagens)
+    conteudo_final.append(prompt)
     
     try:
-        response = requests.post(url, headers=headers, json=payload, timeout=90)
-        if response.status_code == 200:
-            res_json = response.json()
-            return res_json['candidates'][0]['content']['parts'][0]['text']
-        else:
-            return f"Erro HTTP {response.status_code}: {response.text}"
+        # Ativação do Google Search (Web Grounding) combinado com os dados internos dos manuais carregados
+        configuracao = types.GenerateContentConfig(
+            tools=[{"google_search": {}}],
+            temperature=0.1 # Baixa temperatura força fidelidade extrema aos dados fornecidos
+        )
+        
+        response = client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=conteudo_final,
+            config=configuracao
+        )
+        return response.text
     except Exception as e:
-        return f"Falha na conexão com o servidor do Google: {e}"
+        return f"Falha na execução do processamento do Agente Híbrido: {e}"
 
 # ==========================================
-# ABA: EXECUÇÃO DO CHECKLIST
+# 6. ABAS OPERACIONAIS DO APLICATIVO
 # ==========================================
-with aba_auditoria:
-    c1, c2, c3 = st.columns(3)
-    with c1: prefixo = st.text_input("Prefixo da Aeronave:", value="PR-").strip().upper()
-    with c2: modelo = st.text_input("Modelo da Aeronave:").strip().upper()
-    with c3: escopo = st.selectbox("Modalidade de Inspeção:", ["ACCD (Auditoria de Conformidade Contratual Documental)", "ACC (Auditoria de Conformidade Contratual - Física/Documental)", "ACCI (Auditoria de Conformidade Contratual Inicial)"])
+tab_auditoria, tab_documentos, tab_dashboard, tab_conhecimento, tab_admin = st.tabs([
+    "📋 Executar Checklist Regulatório",
+    "📄 Emissão de RAA / RNC",
+    "📊 Painel de Performance (60 Dias)",
+    "📚 Base de Conhecimento & RAG",
+    "🛠️ Gestão de Acessos"
+])
 
+# ------------------------------------------
+# ABA 1: EXECUÇÃO DO CHECKLIST COM SELEÇÃO DE AERONAVE E SIMULADOR
+# ------------------------------------------
+with tab_auditoria:
+    st.header("📋 Auditoria Avançada de Aeronavegabilidade")
+    
+    col_a, col_b, col_c, col_d = st.columns(4)
+    with col_a: prefixo_maquina = st.text_input("Prefixo:", value="PR-", key="p_aud").strip().upper()
+    with col_b: modelo_helicoptero = st.selectbox("Modelo Homologado da Aeronave:", ["AW139 (Leonardo)", "H145 (Airbus)", "S92 (Sikorsky)"])
+    with col_c: escopo_inspecao = st.selectbox("Modalidade de Inspeção Contratual:", ["ACCI (Auditoria Inicial)", "ACC (Física e Documental)", "ACCD (Auditoria Documental)"])
+    with col_d: escopo_norma = st.selectbox("Normativa Principal de Busca:", ["RBAC 91 / 135 (ANAC)", "PE-3PBR (Petrobras)", "Diretriz RINA Sênior"])
+    
     st.write("---")
-    arquivos_auditoria = st.file_uploader("Selecione os arquivos enviados pela operadora (PDFs, Fotos, Planilhas):", type=["pdf", "png", "jpg", "jpeg", "xlsx"], accept_multiple_files=True, key="aud_up")
-
+    arquivos_auditoria = st.file_uploader("Carregue todas as evidências enviadas pela operadora (PDFs, Planilhas de Controle, Cards de Parada, Fotos de Caderneta):", accept_multiple_files=True, type=["pdf", "png", "jpg", "jpeg", "xlsx"], key="up_aud")
+    
     if arquivos_auditoria:
-        if st.button(f"🔍 Rodar Auditoria Otimizada ({len(arquivos_auditoria)} arquivos)"):
-            st.info("⚙️ Processando evidências através de conexão direta na nuvem Google... Cruzando dados...")
+        if st.button(f"🔍 Iniciar Auditoria Híbrida Inteligente"):
             
-            lista_midia, texto_total = extrair_dados_multiplos_arquivos(arquivos_auditoria)
+            # Executa a simulação visual baseada na escolha do Auditor
+            simular_voo_pairado(modelo_helicoptero)
             
-            prompt_auditoria_final = f"""
-            Você é um Engenheiro de Aeronavegabilidade e Auditor Sênior da RINA atuando em contrato Petrobras.
-            Sua tarefa é analisar as evidências e preencher rigorosamente o padrão de Checklist de Auditoria Documental para a aeronave {prefixo} ({modelo}) no escopo {escopo}.
-            Base normativa complementar: \"\"\"{st.session_state.banco_conhecimento}\"\"\"
+            imagens, texto_arquivos = extrair_dados_multiplos_arquivos(arquivos_auditoria)
+            
+            prompt_auditoria = f"""
+            Você é um Engenheiro de Aeronavegabilidade e Auditor Líder da RINA atuando no contrato Petrobras.
+            Sua missão é analisar de forma ultra fiel as evidências enviadas e preencher o checklist técnico para a aeronave {prefixo_maquina} ({modelo_helicoptero}) no escopo {escopo_inspecao} sob as diretrizes de busca da {escopo_norma}.
+            
+            Regras de Negócio e Conhecimento Técnico Interno Fiel:
+            \"\"\"{st.session_state.banco_conhecimento}\"\"\"
 
-            Varra minuciosamente as imagens e os textos fornecidos. Identifique as validades e os dados reais.
-            Determine o Status de cada item estritamente como: 'CF' (Conforme) ou 'NC' (Não Conforme). 
-            No campo 'info_checklist', coloque de forma exata e literal as datas, validades e números de série que encontrar. 
-            No campo 'justificativa', apresente o parecer técnico fundamentado com rigor de auditoria.
+            Varra os arquivos anexados buscando as validades literais e dados numéricos coerentes. Se necessário, utilize a ferramenta de pesquisa integrada do Google para validar portarias ou prazos de normas citadas.
+            Para cada item, determine o Status estritamente como: 'CF' (Conforme) ou 'NC' (Não Conforme). No campo 'info_checklist', coloque de forma exata, literal e resumida as datas de validade, Part Numbers (PN) e Serial Numbers (SN) que encontrar. Não invente nada.
 
-            Retorne estritamente um objeto JSON puro (sem tags markdown, blocos de código ```json ou caracteres extras):
+            Retorne estritamente um objeto JSON puro, sem formatação markdown ou blocos de código ```json:
             {{
-                "item_1": {{"item": "Seguro RETA e Validades de Portarias", "status": "CF", "info_checklist": "Validades exatas e número de adendos encontrados", "justificativa": "Análise técnica fundamentada"}},
-                "item_2": {{"item": "Liberações Técnicas, Ordens de Serviço e Assinaturas (APRS/RII)", "status": "CF", "info_checklist": "Datas de realização e dados das assinaturas identificadas", "justificativa": "Análise técnica fundamentada"}},
-                "item_3": {{"item": "Rastreabilidade de Componentes Classe I e II (Form 1 / FAA 8130-3)", "status": "CF", "info_checklist": "Part Numbers e Serial Numbers verificados nos documentos", "justificativa": "Análise técnica fundamentada"}},
-                "item_4": {{"item": "Certificado de Verificação de Aeronavegabilidade (CVA) e Validade do CA", "status": "CF", "info_checklist": "Datas de vigência e conformidade regulamentar", "justificativa": "Análise técnica fundamentada"}},
-                "item_5": {{"item": "Análise de Histórico de Panes Repetitivas (ATA) - Janela de 60 Dias", "status": "CF", "info_checklist": "Recorrências encontradas ou declaração de conformidade", "justificativa": "Análise técnica fundamentada"}},
+                "item_1": {{"item": "Seguro RETA e Validade das Apólices Obrigatórias", "status": "CF", "info_checklist": "Texto literal encontrado nos arquivos carregados", "justificativa": "Parecer técnico fundamentado"}},
+                "item_2": {{"item": "Liberações Técnicas, Ordens de Serviço e Assinaturas de APRS/RII", "status": "CF", "info_checklist": "Texto literal encontrado", "justificativa": "Parecer técnico"}},
+                "item_3": {{"item": "Rastreabilidade de Componentes Críticos Classe I e II (Form 1 / FAA 8130-3)", "status": "CF", "info_checklist": "PNs e SNs verificados", "justificativa": "Parecer técnico"}},
+                "item_4": {{"item": "Certificado de Verificação de Aeronavegabilidade (CVA) e Validade do CA", "status": "CF", "info_checklist": "Datas de vigência", "justificativa": "Parecer técnico"}},
+                "item_5": {{"item": "Controle de Prazos e Alertas da Janela de Panes de 60 Dias", "status": "CF", "info_checklist": "Resultados de recorrência identificados", "justificativa": "Parecer técnico"}},
                 "gatilhos_vermelhos": 0,
                 "gatilhos_amarelos": 0
             }}
-
-            Textos e Planilhas Extraídos:
-            {texto_total[:15000]}
+            
+            Dados textuais extraídos dos arquivos da operadora:
+            {texto_arquivos[:14000]}
             """
             
-            resposta_texto = chamar_gemini_via_http(prompt_auditoria_final, lista_midia)
+            resposta_agente = executar_chamada_gemini(prompt_auditoria, imagens)
             
-            if "Erro" in resposta_texto or "Falha" in resposta_texto:
-                st.error(resposta_texto)
-            else:
-                try:
-                    res_clean = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", resposta_texto.strip()).strip()
-                    res_json = json.loads(res_clean)
-                    
-                    st.success("📋 Relatório de Checklist Técnico RINA Concluído!")
-                    
-                    # --- MONTAGEM DA TABELA FIEL PARA DOWNLOAD ---
-                    lista_itens = [res_json[f"item_{i}"] for i in range(1, 6)]
-                    df_checklist_respondido = pd.DataFrame(lista_itens)
-                    df_checklist_respondido.columns = ["Item de Inspeção", "Status (CF/NC)", "Dados Coletados (Validades/Datas/Séries)", "Parecer Técnico Fundamentado"]
-                    
-                    output_excel = io.BytesIO()
-                    with pd.ExcelWriter(output_excel, engine='openpyxl') as writer:
-                        df_checklist_respondido.to_excel(writer, index=False, sheet_name="Checklist RINA")
-                    dados_excel_bytes = output_excel.getvalue()
+            try:
+                res_clean = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", resposta_agente.strip()).strip()
+                res_json = json.loads(res_clean)
+                st.success("📋 Relatório de Auditoria e Checklist Técnico RINA Consolidado!")
+                
+                # Geração da Tabela Fiel em Excel para o Download do Cliente
+                lista_itens = [res_json[f"item_{i}"] for i in range(1, 6)]
+                df_excel = pd.DataFrame(lista_itens)
+                df_excel.columns = ["Item do Checklist Oficial RINA", "Status Operacional", "Dados e Validades Coletadas (Fiel)", "Justificativa de Engenharia de Manutenção"]
+                
+                buffer_excel = io.BytesIO()
+                with pd.ExcelWriter(buffer_excel, engine='openpyxl') as writer:
+                    df_excel.to_excel(writer, index=False, sheet_name=f"Checklist {prefixo_maquina}")
+                
+                st.download_button(
+                    label="📥 Baixar Checklist Oficial Respondido em Excel (.xlsx)",
+                    data=buffer_excel.getvalue(),
+                    file_name=f"Checklist_RINA_Oficial_{prefixo_maquina}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+                
+                st.write("---")
+                col_res1, col_res2 = st.columns(2)
+                with col_res1:
+                    for i in range(1, 6):
+                        obj = res_json[f"item_{i}"]
+                        simb = "🟢" if obj["status"] == "CF" else "🔴"
+                        with st.expander(f"{simb} {obj['item']} — [{obj['status']}]", expanded=True):
+                            st.markdown(f"**ℹ️ Evidência Documental:** *{obj['info_checklist']}*")
+                            st.markdown(f"**💬 Julgamento Técnico:** {obj['justificativa']}")
+                with col_res2:
+                    fig = go.Figure(data=[go.Bar(x=["Não Conformidades (NC)", "Alertas Técnicos"], y=[int(res_json["gatilhos_vermelhos"]), int(res_json["gatilhos_amarelos"])], marker_color=['#d9534f', '#f0ad4e'])])
+                    fig.update_layout(template="plotly_white", height=350)
+                    st.plotly_chart(fig, use_container_width=True)
+            except Exception as e:
+                st.error("Erro no processamento lógico estruturado dos dados da IA. Veja o retorno bruto abaixo:")
+                st.code(resposta_agente)
 
-                    st.download_button(
-                        label="📥 Baixar Checklist Oficial Respondido em Excel (.xlsx)",
-                        data=dados_excel_bytes,
-                        file_name=f"Checklist_Oficial_RINA_{prefixo}_{escopo}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
-                    
-                    st.write("---")
-                    col_res1, col_res2 = st.columns(2)
-                    with col_res1:
-                        for i in range(1, 6):
-                            obj = res_json[f"item_{i}"]
-                            simb = "🟢" if obj["status"] == "CF" else "🔴"
-                            with st.expander(f"{simb} {obj['item']} — [{obj['status']}]", expanded=True):
-                                st.markdown(f"**ℹ️ Dados do Checklist:** *{obj['info_checklist']}*")
-                                st.markdown(f"**💬 Parecer Técnico IA:** {obj['justificativa']}")
-                    with col_res2:
-                        fig = go.Figure(data=[go.Bar(x=["Não Conformidades (NC)", "Alertas"], y=[int(res_json["gatilhos_vermelhos"]), int(res_json["gatilhos_amarelos"])], marker_color=['#EF553B', '#FF9900'])])
-                        fig.update_layout(template="plotly_white", height=350)
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                except Exception as e:
-                    st.error(f"Erro ao processar o formato do relatório. Detalhes: {e}")
-                    st.text("Resposta bruta recebida:")
-                    st.code(resposta_texto)
-
-# ==========================================
-# ABA: DASHBOARD DE PERFORMANCE (60 DIAS)
-# ==========================================
-with aba_dashboard:
-    st.header("📊 Análise de Tendências e Janela de 60 Dias")
-    arquivo_dash = st.file_uploader("Carregar PDF ou Print do Painel de Indicadores:", type=["pdf", "png", "jpg", "jpeg", "xlsx"], key="dash_up")
-    if arquivo_dash:
-        if st.button("⚡ Analisar Apenas Gatilhos de Performance"):
-            st.info("Buscando picos de indisponibilidade operacional...")
-            midias, texto_dash = extrair_dados_multiplos_arquivos([arquivo_dash])
-            prompt_dash = f"Analise a evidência buscando eventos críticos operacionais em 60 dias (TOP 10, TOP 3, prazos). Retorne JSON puro sem formatação markdown:\n{{\"panes_repetitivas\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"ranking_indisponibilidade\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"prazo_abertura\": {{\"status\": \"CF\", \"dados\": \"Texto\"}}, \"critico\": 0}}\nTexto: {texto_dash[:10000]}"
+# ------------------------------------------
+# ABA 2: EMISSÃO DE DOCUMENTOS OFICIAIS (RAA / RNC)
+# ------------------------------------------
+with tab_documentos:
+    st.header("📄 Módulo de Geração de Documentos Técnicos de Engenharia")
+    sub_raa, sub_rnc = st.tabs(["📋 RAA (Relatório de Auditoria)", "⚠️ RNC (Registro de Não Conformidade)"])
+    
+    with sub_raa:
+        st.subheader("Gerar Novo RAA Corporativo")
+        c_pref = st.text_input("Prefixo Regulamentar:", value="PR-", key="raa_pref")
+        c_op = st.text_input("Operadora de Logística Offshore:", value="Ex: Omni, Líder, CHC")
+        c_text = st.text_area("Conclusão Técnica e Parecer Final de Aeronavegabilidade:")
+        
+        if st.button("💾 Chancelar e Assinar RAA"):
+            novo_raa = {"Aeronave": c_pref, "Operadora": c_op, "Parecer Técnico": c_text, "Auditor Líder": st.session_state.usuario_logado}
+            st.session_state.historico_raa.append(novo_raa)
+            st.success(f"✅ RAA para a aeronave {c_pref} chancelado e gravado no livro de registros!")
             
-            resposta_dash = chamar_gemini_via_http(prompt_dash, midias)
-            
-            if "Erro" in resposta_dash or "Falha" in resposta_dash:
-                st.error(resposta_dash)
-            else:
-                try:
-                    clean_dash = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", resposta_dash.strip()).strip()
-                    json_dash = json.loads(clean_dash)
-                    st.subheader("🚨 Diagnóstico de Alertas Operacionais")
-                    if json_dash["critico"] == 1: st.error("⚠️ ALERTA: Esta aeronave atingiu gatilhos críticos!")
-                    else: st.success("🟢 Performance operacional em conformidade.")
-                    st.write(f"**🔧 Panes Operativas (ATA):** {json_dash['panes_repetitivas']['dados']}")
-                    st.write(f"**📈 Posição em Rankings:** {json_dash['ranking_indisponibilidade']['dados']}")
-                    st.write(f"**📅 Antecedência de Paradas:** {json_dash['prazo_abertura']['dados']}")
-                except Exception as e: 
-                    st.error(f"Erro: {e}")
-                    st.code(resposta_dash)
+        if st.session_state.historico_raa:
+            st.write("---")
+            st.markdown("**📂 Registro de RAAs Emitidos (Histórico Local):**")
+            st.dataframe(pd.DataFrame(st.session_state.historico_raa))
 
-# ==========================================
-# ABA: BASE DE CONHECIMENTO
-# ==========================================
-with aba_conhecimento:
-    st.header("📝 Treinar e Alimentar o Cérebro da IA")
-    arquivos_banco = st.file_uploader("Carregar manuais para o Banco de Dados:", type=["pdf", "txt", "xlsx"], accept_multiple_files=True, key="banco_up")
-    if arquivos_banco:
-        if st.button("🔄 Incorporar Arquivos ao Banco de Conhecimento"):
-            _, texto_novos_manuais = extrair_dados_multiplos_arquivos(arquivos_banco)
-            st.session_state.banco_conhecimento += f"\n\n[MANUAIS COMPLEMENTARES]:\n{texto_novos_manuais}"
-            st.success(f"✅ {len(arquivos_banco)} documento(s) indexado(s)!")
+    with sub_rnc:
+        st.subheader("Abertura de Registro de Não Conformidade (RNC)")
+        r_pref = st.text_input("Prefixo da Aeronave Bloqueada:", value="PR-", key="rnc_pref")
+        r_item = st.selectbox("Item do Desvio Técnico:", ["Seguro RETA Vencido", "Rastreabilidade Incompleta Form 1", "Assinatura APRS Inexistente", "Estouro de Gatilho de Paradas de 60 Dias"])
+        r_text = st.text_area("Descrição Detalhada e Evidência Física/Documental da Infração:")
+        
+        if st.button("🚨 Emitir e Protocolar RNC"):
+            nova_rnc = {"Aeronave Infratora": r_pref, "Desvio Regulamentar": r_item, "Descrição da Evidência": r_text, "Responsável pela Abertura": st.session_state.usuario_logado}
+            st.session_state.historico_rnc.append(nova_rnc)
+            st.error(f"🔴 RNC Protocolada! Aeronave {r_pref} sinalizada com restrição de operação até a auditoria de acompanhamento.")
+            
+        if st.session_state.historico_rnc:
+            st.write("---")
+            st.markdown("**📂 Painel de RNCs Ativas:**")
+            st.dataframe(pd.DataFrame(st.session_state.historico_rnc))
+
+# ------------------------------------------
+# ABA 3: PAINEL DE PERFORMANCE (JANELA DE 60 DIAS)
+# ------------------------------------------
+with tab_dashboard:
+    st.header("📊 Monitoramento de Confiabilidade e Janela de 60 Dias")
+    st.write("Acompanhamento rigoroso de indisponibilidade de frota, panes repetitivas de sistemas (ATA) e histórico de paradas programadas.")
+    
+    arquivo_painel = st.file_uploader("Insira a Planilha de Disponibilidade ou Imagem do Painel de Indicadores de 60 dias da aeronave:", type=["pdf", "xlsx", "png", "jpg"], key="up_dash")
+    
+    if arquivo_painel:
+        if st.button("⚡ Executar Diagnóstico de Tendências Operacionais"):
+            simular_voo_pairado("Módulo de Confiabilidade")
+            midias, texto_dash = extrair_dados_multiplos_arquivos([arquivo_painel])
+            
+            prompt_dash = f"""
+            Analise a evidência técnica buscando desvios críticos operacionais em 60 dias. 
+            Busque picos de indisponibilidade e recorrência de falhas em sistemas ATA. 
+            Retorne obrigatoriamente um JSON puro, sem markdown:
+            {{"panes_repetitivas": {{"status": "CF", "dados": "Descrição analítica das panes encontradas"}}, "ranking_indisponibilidade": {{"status": "CF", "dados": "Impacto percentual"}}, "critico": 0}}
+            Texto extraído: {texto_dash[:8000]}
+            """
+            
+            resposta_dash = executar_chamada_gemini(prompt_dash, midias)
+            try:
+                clean_dash = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", resposta_dash.strip()).strip()
+                json_dash = json.loads(clean_dash)
+                st.subheader("🚨 Diagnóstico de Alertas Operacionais")
+                if json_dash["critico"] == 1:
+                    st.error("⚠️ ALERTA CRÍTICO: Esta aeronave estourou os limites contratuais de panes repetitivas na janela de 60 dias!")
+                else:
+                    st.success("🟢 Indicadores de performance operacional em conformidade com as metas do contrato Petrobras.")
+                st.write(f"**🔧 Análise de Sistemas ATA (Falhas):** {json_dash['panes_repetitivas']['dados']}")
+                st.write(f"**📈 Posição em Rankings de Indisponibilidade:** {json_dash['ranking_indisponibilidade']['dados']}")
+            except Exception as e:
+                st.error("Falha ao estruturar os dados analíticos do painel.")
+                st.code(resposta_dash)
+
+# ------------------------------------------
+# ABA 4: BASE DE CONHECIMENTO E ARQUIVOS (SISTEMA RAG)
+# ------------------------------------------
+with tab_conhecimento:
+    st.header("📚 Treinamento Base do Sistema de Auditoria (Motor RAG)")
+    st.write("Alimente a memória local da Inteligência Artificial carregando manuais, portarias, PE da Petrobras ou regulamentos RINA.")
+    
+    arquivos_manuais = st.file_uploader("Selecione os Manuais Técnicos Oficiais (PDF, TXT ou XLSX):", accept_multiple_files=True, type=["pdf", "txt", "xlsx"], key="up_banco")
+    if arquivos_manuais:
+        if st.button("🔄 Indexar Documentos na Memória Ativa"):
+            _, novos_textos = extrair_dados_multiplos_arquivos(arquivos_manuais)
+            st.session_state.banco_conhecimento += f"\n\n[MANUAIS TÉCNICOS COMPLEMENTARES INDEXADOS]:\n{novos_textos}"
+            st.success(f"✅ {len(arquivos_manuais)} documento(s) técnico(s) acoplado(s) com sucesso na memória de contexto!")
+            
     st.write("---")
-    texto_manual = st.text_area("Instruções em Texto:", value=st.session_state.banco_conhecimento, height=150)
-    if st.button("Salvar Regras"):
-        st.session_state.banco_conhecimento = texto_manual
-        st.success("Salvo.")
+    regras_texto = st.text_area("Regras e Diretrizes Ativas no Cérebro do Aplicativo:", value=st.session_state.banco_conhecimento, height=200)
+    if st.button("Salvar Modificações de Diretrizes"):
+        st.session_state.banco_conhecimento = rules_text
+        st.success("🧠 Diretrizes operacionais e critérios de aceitabilidade atualizados!")
 
-with aba_admin:
+# ------------------------------------------
+# ABA 5: GESTÃO DE ACESSOS (PAINEL DO SUPERVISOR)
+# ------------------------------------------
+with tab_admin:
     if st.session_state.usuario_logado == "fabio.ferreira@rina.org":
-        st.header("⚙️ Gerenciamento de Alunos")
-        pendentes = [email for email, status in st.session_state.usuarios_db.items() if status == "pendente"]
-        if pendentes:
-            for email_p in pendentes:
+        st.header("🛠️ Painel de Comando do Supervisor Fabio Ferreira")
+        usuarios_pendentes = [email for email, status in st.session_state.usuarios_db.items() if status == "pendente"]
+        if usuarios_pendentes:
+            for email_p in usuarios_pendentes:
                 col_m, col_b = st.columns([3, 1])
                 with col_m: st.text(email_p)
                 with col_b:
-                    if st.button("Aprovar Aluno", key=email_p):
+                    if st.button("Aprovar Inspetor / Aluno", key=email_p):
                         st.session_state.usuarios_db[email_p] = "aprovado"
                         st.rerun()
-        else: st.info("Nenhuma solicitação pendente.")
+        else:
+            st.info("Nenhuma solicitação de acesso pendente na torre de controle.")
+    else:
+        st.warning("🔒 Acesso restrito. Este painel administrativo é de uso exclusivo do Supervisor Fabio Ferreira.")
