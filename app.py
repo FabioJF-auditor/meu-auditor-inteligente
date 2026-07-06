@@ -84,14 +84,15 @@ def extrair_dados_multiplos_arquivos(arquivos):
                 pass
     return conteudo_imagens_api, texto_acumulado
 
-# Função de Conexão Direta HTTP usando a rota v1beta (Homologada Corporativa)
+# Função de Conexão Direta HTTP usando a rota v1beta com o nome corrigido do modelo
 def chamar_gemini_via_http(prompt, imagens_api):
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
     except:
         return "Erro: Chave secreta GEMINI_API_KEY não encontrada no Streamlit."
         
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    # Corrigido para gemini-1.5-flash-latest exigido pela versão v1beta da sua conta
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     
     parts = []
@@ -228,7 +229,7 @@ with aba_dashboard:
                     st.subheader("🚨 Diagnóstico de Alertas Operacionais")
                     if json_dash["critico"] == 1: st.error("⚠️ ALERTA: Esta aeronave atingiu gatilhos críticos!")
                     else: st.success("🟢 Performance operacional em conformidade.")
-                    st.write(f"**🔧 Panes Repetitivas (ATA):** {json_dash['panes_repetitivas']['dados']}")
+                    st.write(f"**🔧 Panes Operativas (ATA):** {json_dash['panes_repetitivas']['dados']}")
                     st.write(f"**📈 Posição em Rankings:** {json_dash['ranking_indisponibilidade']['dados']}")
                     st.write(f"**📅 Antecedência de Paradas:** {json_dash['prazo_abertura']['dados']}")
                 except Exception as e: 
@@ -236,11 +237,10 @@ with aba_dashboard:
                     st.code(resposta_dash)
 
 # ==========================================
-# ABA: BASE DE CONHECIMENTO (CORRIGIDA)
+# ABA: BASE DE CONHECIMENTO
 # ==========================================
 with aba_conhecimento:
     st.header("📝 Treinar e Alimentar o Cérebro da IA")
-    # Sincronizado o nome da variável arquivos_banco com a verificação abaixo
     arquivos_banco = st.file_uploader("Carregar manuais para o Banco de Dados:", type=["pdf", "txt", "xlsx"], accept_multiple_files=True, key="banco_up")
     if arquivos_banco:
         if st.button("🔄 Incorporar Arquivos ao Banco de Conhecimento"):
