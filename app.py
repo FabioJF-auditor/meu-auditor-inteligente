@@ -84,14 +84,13 @@ def extrair_dados_multiplos_arquivos(arquivos):
                 pass
     return conteudo_imagens_api, texto_acumulado
 
-# Função de Conexão Direta HTTP usando a rota v1beta (Compatibilidade Corporativa Total)
+# Função de Conexão Direta HTTP usando a rota v1beta (Homologada Corporativa)
 def chamar_gemini_via_http(prompt, imagens_api):
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
     except:
         return "Erro: Chave secreta GEMINI_API_KEY não encontrada no Streamlit."
         
-    # Mudança estratégica para a rota v1beta que aceita o modelo de forma universal em contas Pro/Enterprise
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     
@@ -236,10 +235,14 @@ with aba_dashboard:
                     st.error(f"Erro: {e}")
                     st.code(resposta_dash)
 
+# ==========================================
+# ABA: BASE DE CONHECIMENTO (CORRIGIDA)
+# ==========================================
 with aba_conhecimento:
     st.header("📝 Treinar e Alimentar o Cérebro da IA")
+    # Sincronizado o nome da variável arquivos_banco com a verificação abaixo
     arquivos_banco = st.file_uploader("Carregar manuais para o Banco de Dados:", type=["pdf", "txt", "xlsx"], accept_multiple_files=True, key="banco_up")
-    if archivos_banco:
+    if arquivos_banco:
         if st.button("🔄 Incorporar Arquivos ao Banco de Conhecimento"):
             _, texto_novos_manuais = extrair_dados_multiplos_arquivos(arquivos_banco)
             st.session_state.banco_conhecimento += f"\n\n[MANUAIS COMPLEMENTARES]:\n{texto_novos_manuais}"
