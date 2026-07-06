@@ -185,10 +185,9 @@ def extrair_dados_multiplos_arquivos(arquivos):
                 pass
     return conteudo_partes, texto_acumulado
 
-def executar_chamada_gemini(prompt, imagens):
+def ejecutar_chamada_gemini(prompt, imagens):
     """Executa a chamada usando a nomenclatura direta para compatibilidade universal"""
     try:
-        # Nomenclatura direta sem o prefixo models/ para chaves do Cloud Console
         model = genai.GenerativeModel('gemini-1.5-flash')
         
         conteudo_final = []
@@ -244,11 +243,11 @@ Para cada item, determine o Status estritamente como: 'CF' (Conforme) ou 'NC' (N
 
 Retorne estritamente um objeto JSON puro, sem formatação markdown ou blocos de código:
 {{
-    "item_1": {{"item": "Seguro RETA e Validade das Apólices Obrigatórias", "status": "CF", "info_checklist": "Texto literal encontrado", "justificativa": "Parecer técnico"}},
-    "item_2": {{"item": "Liberações Técnicas, Ordens de Serviço e Assinaturas de APRS/RII", "status": "CF", "info_checklist": "Texto literal encontrado", "justificativa": "Parecer técnico"}},
-    "item_3": {{"item": "Rastreabilidade de Componentes Críticos Classe I e II (Form 1 / FAA 8130-3)", "status": "CF", "info_checklist": "PNs e SNs verificados", "justificativa": "Parecer técnico"}},
-    "item_4": {{"item": "Certificado de Verificação de Aeronavegabilidade (CVA) e Validade do CA", "status": "CF", "info_checklist": "Datas de vigência", "justificativa": "Parecer técnico"}},
-    "item_5": {{"item": "Controle de Prazos e Alertas da Janela de Panes de 60 Dias", "status": "CF", "info_checklist": "Resultados de recorrência identificados", "justificativa": "Parecer técnico"}},
+    "item_1": {{'item': 'Seguro RETA e Validade das Apólices Obrigatórias', 'status': 'CF', 'info_checklist': 'Texto literal encontrado', 'justificativa': 'Parecer técnico'}},
+    "item_2": {{'item': 'Liberações Técnicas, Ordens de Serviço e Assinaturas de APRS/RII', 'status': 'CF', 'info_checklist': 'Texto literal encontrado', 'justificativa': 'Parecer técnico'}},
+    "item_3": {{'item': 'Rastreabilidade de Componentes Críticos Classe I e II (Form 1 / FAA 8130-3)', 'status': 'CF', 'info_checklist': 'PNs e SNs verificados', 'justificativa': 'Parecer técnico'}},
+    "item_4": {{'item': 'Certificado de Verificação de Aeronavegabilidade (CVA) e Validade do CA', 'status': 'CF', 'info_checklist': 'Datas de vigência', 'justificativa': 'Parecer técnico'}},
+    "item_5": {{'item': 'Controle de Prazos e Alertas da Janela de Panes de 60 Dias', 'status': 'CF', 'info_checklist': 'Resultados de recorrência identificados', 'justificativa': 'Parecer técnico'}},
     "gatilhos_vermelhos": 0,
     "gatilhos_amarelos": 0
 }}
@@ -257,7 +256,7 @@ Dados textuais extraídos:
 {texto_arquivos[:14000]}
 """
             
-            resposta_agente = executar_chamada_gemini(prompt_auditoria, imagens)
+            resposta_agente = ejecutar_chamada_gemini(prompt_auditoria, imagens)
             
             try:
                 res_clean = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", resposta_agente.strip()).strip()
@@ -307,7 +306,7 @@ with tab_documentos:
         st.subheader("Gerar Novo RAA Corporativo")
         c_pref = st.text_input("Prefixo Regulamentar:", value="PR-", key="raa_pref")
         c_op = st.text_input("Operadora de Logística Offshore:", value="Ex: Omni, Líder, CHC")
-        c_text = st.text_area("Conclusão Técnica e Parecer Final:")
+        c_text = st.text_area("Conclusão Técnico e Parecer Final:")
         
         if st.button("💾 Chancelar e Assinar RAA"):
             novo_raa = {"Aeronave": c_pref, "Operadora": c_op, "Parecer Técnico": c_text, "Auditor Líder": st.session_state.usuario_logado}
@@ -358,8 +357,7 @@ Retorne obrigatoriamente um JSON puro, sem markdown:
 }}
 Texto extraído: {texto_dash[:8000]}
 """
-            # CORREÇÃO CRUCIAL AQUI: Passando as variáveis alinhadas para a função correta
-            resposta_dash = executar_chamada_gemini(prompt_dash, midias)
+            resposta_dash = ejecutar_chamada_gemini(prompt_dash, midias)
             try:
                 clean_dash = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", resposta_dash.strip()).strip()
                 json_dash = json.loads(clean_dash)
@@ -391,7 +389,7 @@ with tab_conhecimento:
     st.write("---")
     regras_texto = st.text_area("Regras e Diretrizes Ativas no Cérebro do Aplicativo:", value=st.session_state.banco_conhecimento, height=200)
     if st.button("Salvar Modificações de Diretrizes"):
-        st.session_state.banco_conhecimento = reglas_texto
+        st.session_state.banco_conhecimento = regras_texto
         st.success("🧠 Diretrizes operacionais atualizadas!")
 
 # ------------------------------------------
