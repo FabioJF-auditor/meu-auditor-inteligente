@@ -2,13 +2,12 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from pypdf import PdfReader
+import google.generativeai as genai
 import json
 import re
 from PIL import Image
 import io
 import time
-from google import genai
-from google.genai import types
 
 # ==========================================
 # 1. IDENTIDADE VISUAL RINA BRASIL (CSS CUSTOM)
@@ -19,7 +18,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# Injeção de CSS para customizar as cores institucionais e o ambiente de aviação
 st.markdown("""
     <style>
         /* Cores Principais do App */
@@ -88,6 +86,12 @@ if st.session_state.usuario_logado is None:
                 st.rerun()
     st.stop()
 
+# Configuração da Chave após autenticação
+try:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+except:
+    pass
+
 # ==========================================
 # 3. HUB DE LINKS REGULATÓRIOS (BARRA LATERAL)
 # ==========================================
@@ -115,11 +119,6 @@ with st.sidebar:
     with st.expander("⚓ Autoridade Marítima (DPC)", expanded=False):
         st.link_button("🏛️ Diretoria de Portos e Costas", "https://www.marinha.mil.br/dpc", use_container_width=True)
         st.link_button("📜 Normas NORMAM", "https://www.marinha.mil.br/dpc/normas-e-publicacoes", use_container_width=True)
-
-    with st.expander("⛽ Contratos e Suprimentos Petrobras", expanded=False):
-        st.link_button("🏢 Portal Petrobras", "https://petrobras.com.br", use_container_width=True)
-        st.link_button("🤝 Portal do Fornecedor", "https://fornecedores.petrobras.com.br", use_container_width=True)
-        st.link_button("💻 Petronect (Licitações)", "https://www.petronect.com.br", use_container_width=True)
 
     with st.expander("🌍 Órgãos e Padrões Globais", expanded=False):
         st.link_button("🇺🇳 ICAO", "https://www.icao.int", use_container_width=True)
@@ -158,7 +157,7 @@ def simular_voo_pairado(modelo_aeronave):
     placeholder.empty()
 
 # ==========================================
-# 5. PROCESSAMENTO DE ARQUIVOS E CHAMADA DO AGENTE
+# 5. PROCESSAMENTO DE ARQUIVOS E CHAMADA DO MOTOR ESTÁVEL
 # ==========================================
 def extrair_dados_multiplos_arquivos(arquivos):
     conteudo_partes = []
@@ -187,31 +186,19 @@ def extrair_dados_multiplos_arquivos(arquivos):
     return conteudo_partes, texto_acumulado
 
 def executar_chamada_gemini(prompt, imagens):
-    """Executa a chamada usando o SDK oficial do Google ativando o Grounding com Google Search"""
+    """Executa a chamada usando a biblioteca clássica estável compatível com tokens corporativos"""
     try:
-        api_key = st.secrets["GEMINI_API_KEY"]
-        client = genai.Client(api_key=api_key)
-    except:
-        return "Erro: Chave secreta GEMINI_API_KEY não configurada nos Secrets do Streamlit."
-    
-    conteudo_final = []
-    conteudo_final.extend(imagens)
-    conteudo_final.append(prompt)
-    
-    try:
-        configuracao = types.GenerateContentConfig(
-            tools=[{"google_search": {}}],
-            temperature=0.1
-        )
+        # Força o carregamento clássico do modelo universal de produção estável
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
-        response = client.models.generate_content(
-            model='gemini-1.5-flash',
-            contents=conteudo_final,
-            config=configuracao
-        )
+        conteudo_final = []
+        conteudo_final.extend(imagens)
+        conteudo_final.append(prompt)
+        
+        response = model.generate_content(conteudo_final)
         return response.text
     except Exception as e:
-        return f"Falha na execução do processamento do Agente Híbrido: {e}"
+        return f"Falha na execução do processamento do Motor Estável Gemini: {e}"
 
 # ==========================================
 # 6. ABAS OPERACIONAIS DO APLICATIVO
@@ -252,10 +239,10 @@ Sua missão é analisar de forma ultra fiel as evidências enviadas e preencher 
 Regras de Negócio e Conhecimento Técnico Interno Fiel:
 {st.session_state.banco_conhecimento}
 
-Varra os arquivos anexados buscando as validades literais e dados numéricos coerentes. Se necessário, utilize a ferramenta de pesquisa integrada do Google para validar portarias ou prazos de normas citadas.
+Varra os arquivos anexados buscando as validades literais e dados numéricos coerentes. 
 Para cada item, determine o Status estritamente como: 'CF' (Conforme) ou 'NC' (Não Conforme). No campo 'info_checklist', coloque de forma exata, literal e resumida as datas de validade, Part Numbers (PN) e Serial Numbers (SN) que encontrar. Não invente nada.
 
-Retorne estritamente um objeto JSON puro, sem formatação markdown ou blocks de código:
+Retorne estritamente um objeto JSON puro, sem formatação markdown ou blocos de código:
 {{
     "item_1": {{"item": "Seguro RETA e Validade das Apólices Obrigatórias", "status": "CF", "info_checklist": "Texto literal encontrado", "justificativa": "Parecer técnico"}},
     "item_2": {{"item": "Liberações Técnicas, Ordens de Serviço e Assinaturas de APRS/RII", "status": "CF", "info_checklist": "Texto literal encontrado", "justificativa": "Parecer técnico"}},
@@ -400,8 +387,8 @@ with tab_conhecimento:
     st.write("---")
     regras_texto = st.text_area("Regras e Diretrizes Ativas no Cérebro do Aplicativo:", value=st.session_state.banco_conhecimento, height=200)
     if st.button("Salvar Modificações de Diretrizes"):
-        st.session_state.banco_conhecimento = regras_texto  # LINHA CORRIGIDA AQUI
-        st.success("🧠 Diretrizes operacionais updated!")
+        st.session_state.banco_conhecimento = regras_texto
+        st.success("🧠 Diretrizes operacionais atualizadas!")
 
 # ------------------------------------------
 # ABA 5: GESTÃO DE ACESSOS (PAINEL DO SUPERVISOR)
