@@ -157,7 +157,7 @@ def simular_voo_pairado(modelo_aeronave):
     placeholder.empty()
 
 # ==========================================
-# 5. PROCESSAMENTO DE ARQUIVOS E CHAMADA DO MOTOR BLINDADO
+# 5. PROCESSAMENTO DE ARQUIVOS E CHAMADA DO MOTOR ATUALIZADO
 # ==========================================
 def extrair_dados_multiplos_arquivos(arquivos):
     conteudo_partes = []
@@ -185,29 +185,19 @@ def extrair_dados_multiplos_arquivos(arquivos):
                 pass
     return conteudo_partes, texto_acumulado
 
-def executar_chamada_gemini(prompt, imagens):
-    """Executa a chamada usando uma estratégia de fallback para chaves corporativas"""
+def chamada_motor_blindado_2026(prompt, imagens):
+    """Nova função unificada para quebrar o cache de vez"""
     try:
         conteudo_final = []
         conteudo_final.extend(imagens)
         conteudo_final.append(prompt)
         
-        # Tentativa 1: Nome de produção estável com sufixo -latest (obrigatório para chaves Enterprise)
-        try:
-            model = genai.GenerativeModel('gemini-1.5-flash-latest')
-            response = model.generate_content(conteudo_final)
-            return response.text
-        except Exception as e_first:
-            # Fallback 2: Tentativa sem o prefixo implícito caso a rota falhe
-            if "404" in str(e_first) or "not found" in str(e_first).lower():
-                model = genai.GenerativeModel('models/gemini-1.5-flash-latest')
-                response = model.generate_content(conteudo_final)
-                return response.text
-            else:
-                raise e_first
-                
+        # Forçando o modelo corporativo absoluto para 2026
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        response = model.generate_content(conteudo_final)
+        return response.text
     except Exception as e:
-        return f"Falha na execução do processamento do Motor Estável Gemini: {e}"
+        return f"Falha de execução no motor de produção: {e}"
 
 # ==========================================
 # 6. ABAS OPERACIONAIS DO APLICATIVO
@@ -266,7 +256,7 @@ Dados textuais extraídos:
 {texto_arquivos[:14000]}
 """
             
-            resposta_agente = executar_chamada_gemini(prompt_auditoria, imagens)
+            resposta_agente = chamada_motor_blindado_2026(prompt_auditoria, imagens)
             
             try:
                 res_clean = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", resposta_agente.strip()).strip()
@@ -367,7 +357,8 @@ Retorne obrigatoriamente um JSON puro, sem markdown:
 }}
 Texto extraído: {texto_dash[:8000]}
 """
-            resposta_dash = executar_chamada_gemini(prompt_dash, midias)
+            # Chamando o novo motor blindado na aba de indicadores também
+            resposta_dash = chamada_motor_blindado_2026(prompt_dash, midias)
             try:
                 clean_dash = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", resposta_dash.strip()).strip()
                 json_dash = json.loads(clean_dash)
@@ -390,7 +381,7 @@ with tab_conhecimento:
     st.write("Alimente a memória local carregando manuais, portarias, PE da Petrobras ou regulamentos RINA.")
     
     arquivos_manuais = st.file_uploader("Selecione os Manuais Técnicos Oficiais (PDF, TXT ou XLSX):", accept_multiple_files=True, type=["pdf", "txt", "xlsx"], key="up_banco")
-    if arquivos_manuais:
+    if archivos_manuais:
         if st.button("🔄 Indexar Documentos na Memória Ativa"):
             _, novos_textos = extrair_dados_multiplos_arquivos(arquivos_manuais)
             st.session_state.banco_conhecimento += f"\n\n[MANUAIS TÉCNICOS COMPLEMENTARES INDEXADOS]:\n{novos_textos}"
