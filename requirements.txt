@@ -5,4 +5,3 @@ pypdf
 openpyxl
 pillow
 google-generativeai
-# cache clear stable node v4
