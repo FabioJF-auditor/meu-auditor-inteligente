@@ -185,14 +185,13 @@ def extrair_dados_multiplos_arquivos(arquivos):
                 pass
     return conteudo_partes, texto_acumulado
 
-def chamada_motor_blindado_2026(prompt, imagens):
-    """Chamada limpa de sintaxe estável recomendada pelo Google para chaves corporativas"""
+def llamada_motor_blindado_2026(prompt, imagens):
+    """Chamada estável recomendada pelo Google para chaves corporativas"""
     try:
         conteudo_final = []
         conteudo_final.extend(imagens)
         conteudo_final.append(prompt)
         
-        # Inicialização estável sem o argumento client que conflita tipos
         model = genai.GenerativeModel(model_name='gemini-1.5-flash')
         response = model.generate_content(conteudo_final)
         return response.text
@@ -256,7 +255,7 @@ Dados textuais extraídos:
 {texto_arquivos[:14000]}
 """
             
-            resposta_agente = chamada_motor_blindado_2026(prompt_auditoria, imagens)
+            resposta_agente = llamada_motor_blindado_2026(prompt_auditoria, imagens)
             
             try:
                 res_clean = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", resposta_agente.strip()).strip()
@@ -306,7 +305,7 @@ with tab_documentos:
         st.subheader("Gerar Novo RAA Corporativo")
         c_pref = st.text_input("Prefixo Regulamentar:", value="PR-", key="raa_pref")
         c_op = st.text_input("Operadora de Logística Offshore:", value="Ex: Omni, Líder, CHC")
-        c_text = st.text_area("Conclusão Técnico e Parecer Final:")
+        c_text = st.text_area("Conclusão Técnica e Parecer Final:")
         
         if st.button("💾 Chancelar e Assinar RAA"):
             novo_raa = {"Aeronave": c_pref, "Operadora": c_op, "Parecer Técnico": c_text, "Auditor Líder": st.session_state.usuario_logado}
@@ -344,7 +343,7 @@ with tab_dashboard:
     if arquivo_painel:
         if st.button("📊 Análise do Dashboard"):
             simular_voo_pairado("Módulo de Confiabilidade")
-            midias, texto_dash = extrair_dados_multiplos_arquivos([arquivo_painel])
+            imagens_dash, texto_dash = extrair_dados_multiplos_arquivos([arquivo_painel])
             
             prompt_dash = f"""
 Analise a evidência técnica buscando desvios críticos operacionais em 60 dias. 
@@ -357,7 +356,7 @@ Retorne obrigatoriamente um JSON puro, sem markdown:
 }}
 Texto extraído: {texto_dash[:8000]}
 """
-            resposta_dash = llamada_motor_blindado_2026(prompt_dash, midias)
+            resposta_dash = llamada_motor_blindado_2026(prompt_dash, imagens_dash)
             try:
                 clean_dash = re.sub(r"^```[a-zA-Z]*\n|\n```$", "", resposta_dash.strip()).strip()
                 json_dash = json.loads(clean_dash)
@@ -389,7 +388,7 @@ with tab_conhecimento:
     st.write("---")
     regras_texto = st.text_area("Regras e Diretrizes Ativas no Cérebro do Aplicativo:", value=st.session_state.banco_conhecimento, height=200)
     if st.button("Salvar Modificações de Diretrizes"):
-        st.session_state.banco_conhecimento = rules_texto
+        st.session_state.banco_conhecimento = regras_texto
         st.success("🧠 Diretrizes operacionais atualizadas!")
 
 # ------------------------------------------
