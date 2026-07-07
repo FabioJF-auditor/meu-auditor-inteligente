@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from pypdf import PdfReader
 import google.generativeai as genai
+from google.generativeai import types
 import json
 import re
 from PIL import Image
@@ -157,7 +158,7 @@ def simular_voo_pairado(modelo_aeronave):
     placeholder.empty()
 
 # ==========================================
-# 5. PROCESSAMENTO DE ARQUIVOS E CHAMADA DO MOTOR BLINDADO
+# 5. PROCESSAMENTO DE ARQUIVOS E CHAMADA DO MOTOR ESTÁVEL
 # ==========================================
 def extrair_dados_multiplos_arquivos(arquivos):
     conteudo_partes = []
@@ -186,15 +187,20 @@ def extrair_dados_multiplos_arquivos(arquivos):
     return conteudo_partes, texto_acumulado
 
 def chamada_motor_blindado_2026(prompt, imagens):
-    """Função com fallback de nomenclatura para chaves corporativas"""
+    """Força explicitamente o uso da versão estável 'v1' exigida por chaves corporativas"""
     try:
         conteudo_final = []
         conteudo_final.extend(imagens)
         conteudo_final.append(prompt)
         
-        # Tenta a nomenclatura direta pura sem prefixo (Ideal para contas corporativas)
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(conteudo_final)
+        # Bloqueia a rota v1beta e obriga o uso do canal estável de produção
+        model = genai.GenerativeModel(
+            model_name='models/gemini-1.5-flash',
+            generation_config={"temperature": 0.1}
+        )
+        
+        # Força o cliente a ignorar qualquer rota v1beta oculta nas variáveis do servidor
+        response = model.generate_content(conteudo_final, client=genai.Client(version='v1'))
         return response.text
     except Exception as e:
         return f"Falha de execução no motor de produção: {e}"
@@ -382,7 +388,6 @@ with tab_conhecimento:
     arquivos_manuais = st.file_uploader("Selecione os Manuais Técnicos Oficiais (PDF, TXT ou XLSX):", accept_multiple_files=True, type=["pdf", "txt", "xlsx"], key="up_banco")
     if arquivos_manuais:
         if st.button("🔄 Indexar Documentos na Memória Ativa"):
-            # Variável sincronizada corretamente para evitar NameError
             _, novos_textos = extrair_dados_multiplos_arquivos(arquivos_manuais)
             st.session_state.banco_conhecimento += f"\n\n[MANUAIS TÉCNICOS COMPLEMENTARES INDEXADOS]:\n{novos_textos}"
             st.success(f"✅ {len(arquivos_manuais)} documento(s) técnico(s) acoplado(s) com sucesso!")
@@ -391,7 +396,7 @@ with tab_conhecimento:
     regras_texto = st.text_area("Regras e Diretrizes Ativas no Cérebro do Aplicativo:", value=st.session_state.banco_conhecimento, height=200)
     if st.button("Salvar Modificações de Diretrizes"):
         st.session_state.banco_conhecimento = regras_texto
-        st.success("🧠 Diretrizes operacionais updated!")
+        st.success("🧠 Diretrizes operacionais atualizadas!")
 
 # ------------------------------------------
 # ABA 5: GESTÃO DE ACESSOS (PAINEL DO SUPERVISOR)
